@@ -578,30 +578,25 @@
 
         document.getElementById('weather-desc').innerHTML = `將軍澳 | 濕度: ${humidity}% | ${rainText} ${warningBadge}`;
 
-        // D. 計算「未來兩小時帶遮建議」標籤
-        const rainTipEl = document.getElementById('rain-tip');
-        const swtList = (swtData.swt || []).map(s => s.desc).join(' ');
-        const forecastPeriodText = (flwData.forecastDesc || '') + (flwData.outlook || '');
+    // D. 計算「未來兩小時帶遮建議」標籤 (只憑實時雨量或真實警告觸發)
+            const rainTipEl = document.getElementById('rain-tip');
+            const swtList = (swtData.swt || []).map(s => s.desc).join(' ');
 
-        if (currentRainMm > 0 || (warnData && warnData.WRAIN)) {
-          rainTipEl.className = 'rain-tip danger';
-          rainTipEl.innerText = `☔ 將軍澳現正落雨 (${currentRainMm}mm)，出門務必帶遮！`;
-        } else if (swtList.includes('雨') || swtList.includes('雷暴')) {
-          // 特別天氣提示往往包含未來 1-2 小時定點降雨雷達預警
-          rainTipEl.className = 'rain-tip danger';
-          rainTipEl.innerText = `☔ 天文台短期提示：${swtData.swt[0].desc.slice(0, 28)}...`;
-        } else if (forecastPeriodText.includes('雷暴') || forecastPeriodText.includes('雨')) {
-          rainTipEl.className = 'rain-tip warn';
-          rainTipEl.innerText = `🌂 未來兩小時可能有驟雨，出門建議帶定摺遮`;
-        } else {
-          rainTipEl.className = 'rain-tip safe';
-          rainTipEl.innerText = `🟢 未來兩小時預計無雨，可放心出門`;
+            if (currentRainMm > 0 || (warnData && warnData.WRAIN)) {
+              rainTipEl.className = 'rain-tip danger';
+              rainTipEl.innerText = `☔ 將軍澳現正落雨 (${currentRainMm}mm)，出門務必帶遮！`;
+            } else if (swtList.includes('雨') || swtList.includes('雷暴') || (warnData && warnData.WTS)) {
+              rainTipEl.className = 'rain-tip danger';
+              rainTipEl.innerText = `☔ 天文台雷達顯示附近有雨區或雷暴`;
+            } else {
+              rainTipEl.className = 'rain-tip safe';
+              rainTipEl.innerText = `🟢 將軍澳目前無雨，可放心出門`;
+            }
+
+          } catch (err) {
+            console.error("即時天氣更新失敗:", err);
+          }
         }
-
-      } catch (err) {
-        console.error("即時天氣更新失敗:", err);
-      }
-    }
 
     // E. 抓取未來 5 天天氣預報 (dataType=fnd)
     async function fetch5DayForecast() {
