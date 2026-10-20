@@ -68,25 +68,99 @@
       font-size: 1.3rem;
       margin-bottom: 1rem;
       border-bottom: 1px solid #334155;
-      padding-bottom: 0.5rem;
+      padding-bottom: 0.6rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
     }
     .last-update { font-size: 0.8rem; color: var(--text-muted); font-weight: normal; }
+    .btn-small {
+      background: #334155;
+      color: var(--text);
+      border: none;
+      padding: 0.35rem 0.7rem;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-small.primary { background: var(--accent); color: #0f172a; }
+
+    /* 新增巴士路線面板 */
+    .add-bus-panel {
+      display: none;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 0.8rem;
+      padding: 1rem;
+      margin-bottom: 1.2rem;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+    .add-bus-panel.active { display: flex; }
+    .form-row { display: flex; gap: 0.5rem; align-items: center; }
+    .form-row input, .form-row select {
+      flex: 1;
+      padding: 0.6rem 0.8rem;
+      border-radius: 0.5rem;
+      border: 1px solid #334155;
+      background: var(--card-bg);
+      color: white;
+      font-size: 0.95rem;
+    }
+    .form-row button {
+      padding: 0.6rem 1rem;
+      background: var(--accent);
+      color: #0f172a;
+      border: none;
+      border-radius: 0.5rem;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .status-msg { font-size: 0.85rem; color: #fbbf24; }
 
     /* Bus List */
-    .bus-group { margin-bottom: 1.2rem; }
-    .bus-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 0.4rem; color: #fbbf24; }
+    .bus-group {
+      margin-bottom: 1.2rem;
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 0.8rem;
+    }
+    .bus-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .bus-title { font-size: 1.25rem; font-weight: bold; color: #fbbf24; }
+    .bus-subtitle { font-size: 0.9rem; color: var(--text-muted); font-weight: normal; margin-left: 0.4rem; }
+    .btn-del-bus {
+      background: transparent;
+      border: 1px solid var(--badge-red);
+      color: var(--badge-red);
+      border-radius: 0.4rem;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
     .eta-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.6rem 0;
+      padding: 0.55rem 0;
       border-bottom: 1px dashed #334155;
       font-variant-numeric: tabular-nums;
     }
-    .eta-seq { color: var(--text-muted); }
+    .eta-row:last-child { border-bottom: none; }
+    .eta-seq { color: var(--text-muted); font-size: 0.95rem; }
     .eta-countdown {
       background: #334155;
       padding: 0.25rem 0.7rem;
@@ -151,16 +225,39 @@
     <!-- 巴士實時到站時間 -->
     <div class="card">
       <h2>
-        🚌 景林邨 巴士預計到站
-        <span class="last-update" id="eta-updated">更新中...</span>
+        <span>🚌 巴士預計到站</span>
+        <div class="header-actions">
+          <span class="last-update" id="eta-updated">更新中...</span>
+          <button class="btn-small primary" onclick="toggleAddBusPanel()">＋ 新增路線</button>
+        </div>
       </h2>
+
+      <!-- 互動式新增巴士面板 -->
+      <div class="add-bus-panel" id="add-bus-panel">
+        <div class="form-row">
+          <input type="text" id="route-input" placeholder="輸入路線 (例如: 297, 93A, 98D)" style="text-transform:uppercase;">
+          <button onclick="searchRouteDirections()">1. 搜尋方向</button>
+        </div>
+
+        <div class="form-row" id="dir-row" style="display:none;">
+          <select id="dir-select" onchange="loadRouteStops()"></select>
+        </div>
+
+        <div class="form-row" id="stop-row" style="display:none;">
+          <select id="stop-select"></select>
+          <button onclick="confirmAddBus()">2. 確認加入</button>
+        </div>
+
+        <div class="status-msg" id="bus-search-msg"></div>
+      </div>
+
       <div id="bus-container">載入中...</div>
     </div>
 
     <!-- 備忘錄 / Reminders -->
     <div class="card">
       <h2>
-        📝 家居雲端備忘
+        <span>📝 家居雲端備忘</span>
         <span class="last-update" id="db-status">連線中...</span>
       </h2>
       <div class="reminder-input">
@@ -172,23 +269,198 @@
   </div>
 
   <script>
-    /* ================= 1. 巴士設定 (景林邨 TK206) ================= */
-    const BUS_TRACK_LIST = [
+    /* ================= 1. 初始化 Firebase ================= */
+    const firebaseConfig = {
+      apiKey: "AIzaSyBUHonT_ucWcc3Ks4vprZTZV3ji80CVwD4",
+      authDomain: "my-home-dashboard-5f8ee.firebaseapp.com",
+      databaseURL: "https://my-home-dashboard-5f8ee-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "my-home-dashboard-5f8ee",
+      storageBucket: "my-home-dashboard-5f8ee.firebasestorage.app",
+      messagingSenderId: "508816607799",
+      appId: "1:508816607799:web:c2d1c8f646f973cfd00db2"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const remindersRef = db.ref('reminders');
+    const busListRef = db.ref('bus_list');
+
+    // 預設巴士清單 (當 Firebase 仲未有資料時自動寫入)
+    const DEFAULT_BUS_LIST = [
       {
         route: "297",
         dest: "景林邨 往 紅磡(紅鸞道)",
         stop_id: "22E2678081E88368",
+        dir: "outbound",
         service_type: "1"
       },
       {
         route: "93A",
         dest: "景林邨 往 觀塘碼頭",
         stop_id: "22E2678081E88368",
+        dir: "outbound",
         service_type: "1"
       }
     ];
 
-    /* ================= 2. 時間與日期 (連秒數) ================= */
+    let BUS_TRACK_LIST = []; // 由 Firebase 動態同步
+
+    // 監聽雲端巴士清單
+    busListRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        // 如果雲端完全空白，自動初始化預設景林邨路線
+        DEFAULT_BUS_LIST.forEach(item => busListRef.push(item));
+        return;
+      }
+      BUS_TRACK_LIST = Object.keys(data).map(key => ({
+        firebaseKey: key,
+        ...data[key]
+      }));
+      fetchBusETA();
+    });
+
+    /* ================= 2. 互動式搜尋九巴路線及站點 ================= */
+    let allStopsCache = null; // 快取全港九巴站名，加速查詢
+
+    function toggleAddBusPanel() {
+      const panel = document.getElementById('add-bus-panel');
+      panel.classList.toggle('active');
+    }
+
+    // 步驟 1：查詢該路線有邊幾個方向及服務類別
+    async function searchRouteDirections() {
+      const routeInput = document.getElementById('route-input').value.trim().toUpperCase();
+      const msg = document.getElementById('bus-search-msg');
+      const dirRow = document.getElementById('dir-row');
+      const stopRow = document.getElementById('stop-row');
+      const dirSelect = document.getElementById('dir-select');
+
+      if (!routeInput) return;
+      msg.innerText = `正在搜尋 ${routeInput} 路線資料...`;
+      dirRow.style.display = 'none';
+      stopRow.style.display = 'none';
+
+      try {
+        const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route/`);
+        const json = await res.json();
+        const matches = (json.data || []).filter(r => r.route === routeInput);
+
+        if (matches.length === 0) {
+          msg.innerText = `❌ 搵唔到九巴路線「${routeInput}」，請確認號碼是否正確。`;
+          return;
+        }
+
+        dirSelect.innerHTML = `<option value="">-- 請選擇行車方向 --</option>`;
+        matches.forEach(m => {
+          const boundText = m.bound === 'O' ? 'outbound' : 'inbound';
+          const specialNote = m.service_type !== '1' ? ` (特別班次 ${m.service_type})` : '';
+          const val = JSON.stringify({
+            route: m.route,
+            bound: boundText,
+            service_type: m.service_type,
+            orig_tc: m.orig_tc,
+            dest_tc: m.dest_tc
+          });
+          dirSelect.innerHTML += `<option value='${val}'>${m.orig_tc} ➔ 往 ${m.dest_tc}${specialNote}</option>`;
+        });
+
+        dirRow.style.display = 'flex';
+        msg.innerText = `請選擇行車方向：`;
+      } catch (err) {
+        msg.innerText = `搜尋失敗，請稍後再試。`;
+      }
+    }
+
+    // 步驟 2：根據所選方向，列出沿途所有巴士站中文名
+    async function loadRouteStops() {
+      const dirVal = document.getElementById('dir-select').value;
+      const stopRow = document.getElementById('stop-row');
+      const stopSelect = document.getElementById('stop-select');
+      const msg = document.getElementById('bus-search-msg');
+
+      if (!dirVal) {
+        stopRow.style.display = 'none';
+        return;
+      }
+
+      const info = JSON.parse(dirVal);
+      msg.innerText = `正在載入 ${info.route} (往${info.dest_tc}) 沿途巴士站...`;
+      stopRow.style.display = 'none';
+
+      try {
+        // 先載入全港站點名稱字典 (只載入一次並快取)
+        if (!allStopsCache) {
+          const allStopsRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/stop');
+          const allStopsJson = await allStopsRes.json();
+          allStopsCache = {};
+          (allStopsJson.data || []).forEach(s => {
+            allStopsCache[s.stop] = s.name_tc;
+          });
+        }
+
+        // 讀取該路線嘅站點順序
+        const url = `https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${info.route}/${info.bound}/${info.service_type}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        const routeStops = json.data || [];
+
+        if (routeStops.length === 0) {
+          msg.innerText = `❌ 此方向暫無站點資料。`;
+          return;
+        }
+
+        stopSelect.innerHTML = '';
+        routeStops.forEach(rs => {
+          const stopName = allStopsCache[rs.stop] || rs.stop;
+          const cleanName = stopName.replace(/\s*\([A-Z0-9]+\)$/, ''); // 簡化顯示用
+          const optionData = JSON.stringify({
+            route: info.route,
+            stop_id: rs.stop,
+            stop_name: cleanName,
+            dest_tc: info.dest_tc,
+            dir: info.bound,
+            service_type: info.service_type
+          });
+          stopSelect.innerHTML += `<option value='${optionData}'>${rs.seq}. ${stopName}</option>`;
+        });
+
+        stopRow.style.display = 'flex';
+        msg.innerText = `請揀選你上車嘅巴士站，然後撳「確認加入」：`;
+      } catch (err) {
+        console.error(err);
+        msg.innerText = `載入站點失敗，請重試。`;
+      }
+    }
+
+    // 步驟 3：儲存新巴士線到 Firebase
+    function confirmAddBus() {
+      const stopVal = document.getElementById('stop-select').value;
+      if (!stopVal) return;
+
+      const data = JSON.parse(stopVal);
+      busListRef.push({
+        route: data.route,
+        dest: `${data.stop_name} 往 ${data.dest_tc}`,
+        stop_id: data.stop_id,
+        dir: data.dir,
+        service_type: String(data.service_type)
+      });
+
+      // 重置並收起面板
+      document.getElementById('route-input').value = '';
+      document.getElementById('dir-row').style.display = 'none';
+      document.getElementById('stop-row').style.display = 'none';
+      document.getElementById('bus-search-msg').innerText = '';
+      document.getElementById('add-bus-panel').classList.remove('active');
+    }
+
+    // 刪除巴士路線
+    function removeBusRoute(firebaseKey) {
+      busListRef.child(firebaseKey).remove();
+    }
+
+    /* ================= 3. 時間與日期 (連秒數) ================= */
     function updateClock() {
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
@@ -202,13 +474,12 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    /* ================= 3. 天文台即時天氣 (優先讀取將軍澳站) ================= */
+    /* ================= 4. 天文台即時天氣 (優先讀取將軍澳站) ================= */
     async function fetchWeather() {
       try {
         const res = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc&t=${Date.now()}`);
         const data = await res.json();
         if (data.temperature && data.temperature.data.length > 0) {
-          // 優先尋找「將軍澳」分區氣溫，若無則用第一個站點
           const tkoStation = data.temperature.data.find(d => d.place === '將軍澳') || data.temperature.data[0];
           const humidity = data.humidity.data[0].value;
           document.getElementById('temp').innerText = `${tkoStation.value}°C`;
@@ -219,12 +490,17 @@
       }
     }
     fetchWeather();
-    setInterval(fetchWeather, 5 * 60 * 1000); // 每 5 分鐘更新天氣
+    setInterval(fetchWeather, 5 * 60 * 1000);
 
-    /* ================= 4. 九巴實時到站時間 (每秒即時倒數版) ================= */
+    /* ================= 5. 九巴實時到站時間 (每秒即時倒數版) ================= */
     let latestBusData = [];
 
     async function fetchBusETA() {
+      if (BUS_TRACK_LIST.length === 0) {
+        document.getElementById('bus-container').innerHTML = '<div style="color:#64748b;">暫無監察路線，請按右上角「＋ 新增路線」</div>';
+        return;
+      }
+
       const tempResults = [];
 
       for (const item of BUS_TRACK_LIST) {
@@ -233,9 +509,9 @@
           const res = await fetch(url, { cache: "no-store" });
           const json = await res.json();
 
-          // 只過濾出往該方向 (O = Outbound) 且有預計時間嘅頭 3 班車
+          const expectedDirCode = item.dir === 'inbound' ? 'I' : 'O';
           const etas = (json.data || [])
-            .filter(e => e.eta && (!e.dir || e.dir === 'O'))
+            .filter(e => e.eta && (!e.dir || e.dir === expectedDirCode))
             .slice(0, 3);
 
           tempResults.push({ ...item, etas: etas, error: false });
@@ -246,7 +522,7 @@
       }
 
       latestBusData = tempResults;
-      document.getElementById('eta-updated').innerText = `API 同步: ${new Date().toLocaleTimeString('zh-HK', { hour12: false })}`;
+      document.getElementById('eta-updated').innerText = `同步: ${new Date().toLocaleTimeString('zh-HK', { hour12: false })}`;
       renderBusETA();
     }
 
@@ -260,7 +536,13 @@
       for (const item of latestBusData) {
         html += `
           <div class="bus-group">
-            <div class="bus-title">${item.route} <span style="font-size:0.9rem; color:#94a3b8;">(${item.dest})</span></div>
+            <div class="bus-header">
+              <div class="bus-title">
+                ${item.route}
+                <span class="bus-subtitle">(${item.dest})</span>
+              </div>
+              <button class="btn-del-bus" onclick="removeBusRoute('${item.firebaseKey}')">刪除</button>
+            </div>
         `;
 
         if (item.error) {
@@ -302,62 +584,43 @@
       container.innerHTML = html;
     }
 
-    fetchBusETA();
     setInterval(fetchBusETA, 15 * 1000); // 每 15 秒向九巴攞一次新資料
     setInterval(renderBusETA, 1000);     // 每 1 秒更新畫面倒數
 
-    /* ================= 5. 家居備忘 (Firebase 即時雲端同步) ================= */
-    const firebaseConfig = {
-          apiKey: "AIzaSyBUHonT_ucWcc3Ks4vprZTZV3ji80CVwD4",
-          authDomain: "my-home-dashboard-5f8ee.firebaseapp.com",
-          databaseURL: "https://my-home-dashboard-5f8ee-default-rtdb.asia-southeast1.firebasedatabase.app",
-          projectId: "my-home-dashboard-5f8ee",
-          storageBucket: "my-home-dashboard-5f8ee.firebasestorage.app",
-          messagingSenderId: "508816607799",
-          appId: "1:508816607799:web:c2d1c8f646f973cfd00db2"
-        };
+    /* ================= 6. 家居備忘 (Firebase 即時雲端同步) ================= */
+    remindersRef.on('value', (snapshot) => {
+      document.getElementById('db-status').innerText = '🟢 已同步';
+      const data = snapshot.val();
+      const ul = document.getElementById('rem-list');
+      ul.innerHTML = '';
 
-    try {
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.database();
-      const remindersRef = db.ref('reminders');
+      if (!data) return;
 
-      remindersRef.on('value', (snapshot) => {
-        document.getElementById('db-status').innerText = '🟢 已同步';
-        const data = snapshot.val();
-        const ul = document.getElementById('rem-list');
-        ul.innerHTML = '';
-
-        if (!data) return;
-
-        Object.keys(data).forEach((key) => {
-          const itemText = data[key].text;
-          ul.innerHTML += `
-            <li class="reminder-item">
-              <span>${itemText}</span>
-              <button onclick="removeReminder('${key}')">✕</button>
-            </li>
-          `;
-        });
-      }, (error) => {
-        console.error("Firebase 讀取失敗:", error);
-        document.getElementById('db-status').innerText = '🔴 請檢查 databaseURL 或權限';
+      Object.keys(data).forEach((key) => {
+        const itemText = data[key].text;
+        ul.innerHTML += `
+          <li class="reminder-item">
+            <span>${itemText}</span>
+            <button onclick="removeReminder('${key}')">✕</button>
+          </li>
+        `;
       });
+    }, (error) => {
+      console.error("Firebase 讀取失敗:", error);
+      document.getElementById('db-status').innerText = '🔴 權限或網址錯誤';
+    });
 
-      window.addReminder = function() {
-        const input = document.getElementById('rem-input');
-        const val = input.value.trim();
-        if (!val) return;
-        remindersRef.push({ text: val, createdAt: Date.now() });
-        input.value = '';
-      };
+    window.addReminder = function() {
+      const input = document.getElementById('rem-input');
+      const val = input.value.trim();
+      if (!val) return;
+      remindersRef.push({ text: val, createdAt: Date.now() });
+      input.value = '';
+    };
 
-      window.removeReminder = function(key) {
-        remindersRef.child(key).remove();
-      };
-    } catch (e) {
-      console.error("Firebase 初始化錯誤:", e);
-    }
+    window.removeReminder = function(key) {
+      remindersRef.child(key).remove();
+    };
 
     function handleEnter(e) {
       if (e.key === 'Enter') window.addReminder();
