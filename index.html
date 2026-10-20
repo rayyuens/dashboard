@@ -207,59 +207,98 @@
     fetchWeather();
     setInterval(fetchWeather, 5 * 60 * 1000); // 每 5 分鐘更新一次天氣
 
-    /* ================= 4. 九巴實時到站時間 (ETA) ================= */
+/* ================= 4. 九巴實時到站時間 (每秒即時倒數版) ================= */
+    let latestBusData = []; // 儲存最新拉返嚟嘅巴士資料
+
+    // A. 背景每 15 秒向九巴攞一次最新數據 (加入 timestamp 防止 iPad Safari 快取)
     async function fetchBusETA() {
-      const container = document.getElementById('bus-container');
-      let html = '';
+      const tempResults = [];
 
       for (const item of BUS_TRACK_LIST) {
         try {
-          // 九巴公開 API: /v1/transport/kmb/eta/{stop_id}/{route}/{service_type}
-          const url = `https://data.etabus.gov.hk/v1/transport/kmb/eta/${item.stop_id}/${item.route}/${item.service_type}`;
-          const res = await fetch(url);
+          // 加上 ?t=... 強制 Safari 唔好用舊 Cache
+          const url = `https://data.etabus.gov.hk/v1/transport/kmb/eta/${item.stop_id}/${item.route}/${item.service_type}?t=${Date.now()}`;
+          const res = await fetch(url, { cache: "no-store" });
           const json = await res.json();
 
-          // 篩選有效的下 3 班車
+          // 只保留有實際預計時間嘅頭 3 班車
           const etas = (json.data || [])
             .filter(e => e.eta)
             .slice(0, 3);
 
-          html += `
-            <div class="bus-group">
-              <div class="bus-title">${item.route} <span style="font-size:0.9rem; color:#94a3b8;">(${item.dest})</span></div>
-          `;
-
-          if (etas.length === 0) {
-            html += `<div style="color:#64748b; font-size:0.9rem;">未有實時到站班次 / 已過尾班車</div>`;
-          } else {
-            etas.forEach((e, idx) => {
-              const etaDate = new Date(e.eta);
-              const diffMin = Math.round((etaDate - new Date()) / 60000);
-              const etaTimeStr = etaDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
-              const isUrgent = diffMin <= 5 && diffMin >= 0;
-
-              html += `
-                <div class="eta-row">
-                  <span class="eta-seq">第 ${idx + 1} 班 (${etaTimeStr})</span>
-                  <span class="eta-countdown ${isUrgent ? 'eta-urgent' : ''}">
-                    ${diffMin <= 0 ? '即將抵達' : diffMin + ' 分鐘'}
-                  </span>
-                </div>
-              `;
-            });
-          }
-          html += `</div>`;
+          tempResults.push({
+            ...item,
+            etas: etas,
+            error: false
+          });
         } catch (err) {
           console.error(`獲取 ${item.route} 失敗:`, err);
+          tempResults.push({ ...item, etas: [], error: true });
         }
       }
 
-      container.innerHTML = html;
-      document.getElementById('eta-updated').innerText = `最後更新: ${new Date().toLocaleTimeString('zh-HK')}`;
+      latestBusData = tempResults;
+      document.getElementById('eta-updated').innerText = `API 同步: ${new Date().toLocaleTimeString('zh-HK', { hour12: false })}`;
+      renderBusETA(); // 攞完數據即刻畫一次畫面
     }
 
+    // B. 每 1 秒鐘更新一次畫面上面嘅「分：秒」倒數
+    function renderBusETA() {
+      const container = document.getElementById('bus-container');
+      if (latestBusData.length === 0) return;
+
+      const now = new Date();
+      let html = '';
+
+      for (const item of latestBusData) {
+        html += `
+          <div class="bus-group">
+            <div class="bus-title">${item.route} <span style="font-size:0.9rem; color:#94a3b8;">(${item.dest})</span></div>
+        `;
+
+        if (item.error) {
+          html += `<div style="color:#ef4444; font-size:0.9rem;">連線失敗，重試中...</div>`;
+        } else if (item.etas.length === 0) {
+          html += `<div style="color:#64748b; font-size:0.9rem;">未有實時班次 / 已過尾班車</div>`;
+        } else {
+          item.etas.forEach((e, idx) => {
+            const etaDate = new Date(e.eta);
+            const diffSec = Math.floor((etaDate - now) / 1000); // 計算相差幾多秒
+            const etaTimeStr = etaDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+            let countdownText = '';
+            let isUrgent = false;
+
+            if (diffSec <= 0) {
+              countdownText = '即將抵達 / 已到站';
+              isUrgent = true;
+            } else {
+              const mins = Math.floor(diffSec / 60);
+              const secs = String(diffSec % 60).padStart(2, '0');
+              countdownText = `${mins}分 ${secs}秒`;
+              if (mins < 5) isUrgent = true; // 少過 5 分鐘轉綠色醒目提示
+            }
+
+            html += `
+              <div class="eta-row">
+                <span class="eta-seq">第 ${idx + 1} 班 (${etaTimeStr})</span>
+                <span class="eta-countdown ${isUrgent ? 'eta-urgent' : ''}">
+                  ${countdownText}
+                </span>
+              </div>
+            `;
+          });
+        }
+        html += `</div>`;
+      }
+
+      container.innerHTML = html;
+    }
+
+    // 啟動執行
     fetchBusETA();
-    setInterval(fetchBusETA, 30 * 1000); // 巴士班次每 30 秒自動更新一次
+    setInterval(fetchBusETA, 15 * 1000); // 每 15 秒向九巴伺服器同步一次
+    setInterval(renderBusETA, 1000);     // 每 1 秒鐘即時跳動畫面倒數
 
     /* ================= 5. 家居備忘 (Local Storage) ================= */
     function loadReminders() {
