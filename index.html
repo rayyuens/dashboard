@@ -3,7 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Home Dashboard</title>
+
+  <!-- 引入 Firebase App & Realtime Database SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <style>
     :root {
       --bg: #0f172a;
@@ -32,7 +39,7 @@
       padding: 1.5rem 2rem;
       border-radius: 1.2rem;
     }
-    .time-box h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -1px; }
+    .time-box h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
     .time-box p { font-size: 1.2rem; color: var(--text-muted); }
     .weather-box { text-align: right; }
     .weather-temp { font-size: 2.8rem; font-weight: 700; color: var(--accent); }
@@ -46,6 +53,8 @@
     }
     @media (max-width: 768px) {
       .main-grid { grid-template-columns: 1fr; }
+      .time-box h1 { font-size: 2.5rem; }
+      .weather-temp { font-size: 2rem; }
     }
 
     .card {
@@ -75,14 +84,14 @@
       align-items: center;
       padding: 0.6rem 0;
       border-bottom: 1px dashed #334155;
+      font-variant-numeric: tabular-nums;
     }
     .eta-seq { color: var(--text-muted); }
-    .eta-time { font-weight: 600; }
     .eta-countdown {
       background: #334155;
-      padding: 0.2rem 0.6rem;
+      padding: 0.25rem 0.7rem;
       border-radius: 999px;
-      font-size: 0.85rem;
+      font-size: 0.9rem;
     }
     .eta-urgent { background: var(--badge-green); color: black; font-weight: bold; }
 
@@ -95,6 +104,7 @@
       border: 1px solid #334155;
       background: #0f172a;
       color: white;
+      font-size: 1rem;
     }
     .reminder-input button {
       padding: 0.6rem 1rem;
@@ -110,7 +120,7 @@
       justify-content: space-between;
       align-items: center;
       background: #0f172a;
-      padding: 0.6rem 0.8rem;
+      padding: 0.7rem 0.9rem;
       border-radius: 0.5rem;
     }
     .reminder-item button {
@@ -119,6 +129,7 @@
       color: var(--badge-red);
       font-size: 1.1rem;
       cursor: pointer;
+      padding: 0 0.4rem;
     }
   </style>
 </head>
@@ -127,7 +138,7 @@
   <!-- 頂部：時鐘、日期、即時天氣 -->
   <div class="top-bar">
     <div class="time-box">
-      <h1 id="clock">--:--</h1>
+      <h1 id="clock">--:--:--</h1>
       <p id="date">載入中...</p>
     </div>
     <div class="weather-box">
@@ -140,7 +151,7 @@
     <!-- 巴士實時到站時間 -->
     <div class="card">
       <h2>
-        🚌 巴士預計到站
+        🚌 景林邨 巴士預計到站
         <span class="last-update" id="eta-updated">更新中...</span>
       </h2>
       <div id="bus-container">載入中...</div>
@@ -148,7 +159,10 @@
 
     <!-- 備忘錄 / Reminders -->
     <div class="card">
-      <h2>📝 家居備忘</h2>
+      <h2>
+        📝 家居雲端備忘
+        <span class="last-update" id="db-status">連線中...</span>
+      </h2>
       <div class="reminder-input">
         <input type="text" id="rem-input" placeholder="新增備忘項目..." onkeypress="handleEnter(event)">
         <button onclick="addReminder()">新增</button>
@@ -158,29 +172,29 @@
   </div>
 
   <script>
-    /* ================= 1. 巴士設定 (請填入屋企附近站點的 stop_id) ================= */
-    // stop_id 可以透過九巴 API 或者下文查到
+    /* ================= 1. 巴士設定 (景林邨 TK206) ================= */
     const BUS_TRACK_LIST = [
       {
-        route: "93A",
-        dest: "寶林 往 觀塘碼頭",
-        stop_id: "22E2678081E88368", // 範例站點 ID (請替換為你的站點)
+        route: "297",
+        dest: "景林邨 往 紅磡(紅鸞道)",
+        stop_id: "22E2678081E88368",
         service_type: "1"
       },
       {
-        route: "297",
-        dest: "寶林 往 紅磡",
-        stop_id: "22E2678081E88368", // 範例站點 ID (請替換為你的站點)
+        route: "93A",
+        dest: "景林邨 往 觀塘碼頭",
+        stop_id: "22E2678081E88368",
         service_type: "1"
       }
     ];
 
-    /* ================= 2. 時間與日期 ================= */
+    /* ================= 2. 時間與日期 (連秒數) ================= */
     function updateClock() {
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
       const mm = String(now.getMinutes()).padStart(2, '0');
-      document.getElementById('clock').innerText = `${hh}:${mm}`;
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('clock').innerText = `${hh}:${mm}:${ss}`;
 
       const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
       document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', options);
@@ -188,49 +202,43 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    /* ================= 3. 天文台即時天氣 ================= */
+    /* ================= 3. 天文台即時天氣 (優先讀取將軍澳站) ================= */
     async function fetchWeather() {
       try {
-        const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
+        const res = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc&t=${Date.now()}`);
         const data = await res.json();
         if (data.temperature && data.temperature.data.length > 0) {
-          // 預設取香港天文台站或區域氣溫
-          const temp = data.temperature.data[0].value;
+          // 優先尋找「將軍澳」分區氣溫，若無則用第一個站點
+          const tkoStation = data.temperature.data.find(d => d.place === '將軍澳') || data.temperature.data[0];
           const humidity = data.humidity.data[0].value;
-          document.getElementById('temp').innerText = `${temp}°C`;
-          document.getElementById('weather-desc').innerText = `濕度: ${humidity}% | 天文台`;
+          document.getElementById('temp').innerText = `${tkoStation.value}°C`;
+          document.getElementById('weather-desc').innerText = `${tkoStation.place} | 濕度: ${humidity}%`;
         }
       } catch (err) {
         console.error("天氣更新失敗:", err);
       }
     }
     fetchWeather();
-    setInterval(fetchWeather, 5 * 60 * 1000); // 每 5 分鐘更新一次天氣
+    setInterval(fetchWeather, 5 * 60 * 1000); // 每 5 分鐘更新天氣
 
-/* ================= 4. 九巴實時到站時間 (每秒即時倒數版) ================= */
-    let latestBusData = []; // 儲存最新拉返嚟嘅巴士資料
+    /* ================= 4. 九巴實時到站時間 (每秒即時倒數版) ================= */
+    let latestBusData = [];
 
-    // A. 背景每 15 秒向九巴攞一次最新數據 (加入 timestamp 防止 iPad Safari 快取)
     async function fetchBusETA() {
       const tempResults = [];
 
       for (const item of BUS_TRACK_LIST) {
         try {
-          // 加上 ?t=... 強制 Safari 唔好用舊 Cache
           const url = `https://data.etabus.gov.hk/v1/transport/kmb/eta/${item.stop_id}/${item.route}/${item.service_type}?t=${Date.now()}`;
           const res = await fetch(url, { cache: "no-store" });
           const json = await res.json();
 
-          // 只保留有實際預計時間嘅頭 3 班車
+          // 只過濾出往該方向 (O = Outbound) 且有預計時間嘅頭 3 班車
           const etas = (json.data || [])
-            .filter(e => e.eta)
+            .filter(e => e.eta && (!e.dir || e.dir === 'O'))
             .slice(0, 3);
 
-          tempResults.push({
-            ...item,
-            etas: etas,
-            error: false
-          });
+          tempResults.push({ ...item, etas: etas, error: false });
         } catch (err) {
           console.error(`獲取 ${item.route} 失敗:`, err);
           tempResults.push({ ...item, etas: [], error: true });
@@ -239,10 +247,9 @@
 
       latestBusData = tempResults;
       document.getElementById('eta-updated').innerText = `API 同步: ${new Date().toLocaleTimeString('zh-HK', { hour12: false })}`;
-      renderBusETA(); // 攞完數據即刻畫一次畫面
+      renderBusETA();
     }
 
-    // B. 每 1 秒鐘更新一次畫面上面嘅「分：秒」倒數
     function renderBusETA() {
       const container = document.getElementById('bus-container');
       if (latestBusData.length === 0) return;
@@ -263,7 +270,7 @@
         } else {
           item.etas.forEach((e, idx) => {
             const etaDate = new Date(e.eta);
-            const diffSec = Math.floor((etaDate - now) / 1000); // 計算相差幾多秒
+            const diffSec = Math.floor((etaDate - now) / 1000);
             const etaTimeStr = etaDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
             let countdownText = '';
@@ -276,7 +283,7 @@
               const mins = Math.floor(diffSec / 60);
               const secs = String(diffSec % 60).padStart(2, '0');
               countdownText = `${mins}分 ${secs}秒`;
-              if (mins < 5) isUrgent = true; // 少過 5 分鐘轉綠色醒目提示
+              if (mins < 5) isUrgent = true;
             }
 
             html += `
@@ -295,49 +302,66 @@
       container.innerHTML = html;
     }
 
-    // 啟動執行
     fetchBusETA();
-    setInterval(fetchBusETA, 15 * 1000); // 每 15 秒向九巴伺服器同步一次
-    setInterval(renderBusETA, 1000);     // 每 1 秒鐘即時跳動畫面倒數
+    setInterval(fetchBusETA, 15 * 1000); // 每 15 秒向九巴攞一次新資料
+    setInterval(renderBusETA, 1000);     // 每 1 秒更新畫面倒數
 
-    /* ================= 5. 家居備忘 (Local Storage) ================= */
-    function loadReminders() {
-      const list = JSON.parse(localStorage.getItem('home_reminders') || '[]');
-      const ul = document.getElementById('rem-list');
-      ul.innerHTML = '';
-      list.forEach((item, index) => {
-        ul.innerHTML += `
-          <li class="reminder-item">
-            <span>${item}</span>
-            <button onclick="removeReminder(${index})">✕</button>
-          </li>
-        `;
+    /* ================= 5. 家居備忘 (Firebase 即時雲端同步) ================= */
+    const firebaseConfig = {
+      apiKey: "AIzaSyBUHonT_ucWcc3Ks4vprZTZV3ji80CVwD4",
+      authDomain: "my-home-dashboard-5f8ee.firebaseapp.com",
+      databaseURL: "https://my-home-dashboard-5f8ee-default-rtdb.firebaseio.com",
+      projectId: "my-home-dashboard-5f8ee",
+      storageBucket: "my-home-dashboard-5f8ee.firebasestorage.app",
+      messagingSenderId: "508816607799",
+      appId: "1:508816607799:web:c2d1c8f646f973cfd00db2"
+    };
+
+    try {
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+      const remindersRef = db.ref('reminders');
+
+      remindersRef.on('value', (snapshot) => {
+        document.getElementById('db-status').innerText = '🟢 已同步';
+        const data = snapshot.val();
+        const ul = document.getElementById('rem-list');
+        ul.innerHTML = '';
+
+        if (!data) return;
+
+        Object.keys(data).forEach((key) => {
+          const itemText = data[key].text;
+          ul.innerHTML += `
+            <li class="reminder-item">
+              <span>${itemText}</span>
+              <button onclick="removeReminder('${key}')">✕</button>
+            </li>
+          `;
+        });
+      }, (error) => {
+        console.error("Firebase 讀取失敗:", error);
+        document.getElementById('db-status').innerText = '🔴 請檢查 databaseURL 或權限';
       });
-    }
 
-    function addReminder() {
-      const input = document.getElementById('rem-input');
-      const val = input.value.trim();
-      if (!val) return;
-      const list = JSON.parse(localStorage.getItem('home_reminders') || '[]');
-      list.push(val);
-      localStorage.setItem('home_reminders', JSON.stringify(list));
-      input.value = '';
-      loadReminders();
-    }
+      window.addReminder = function() {
+        const input = document.getElementById('rem-input');
+        const val = input.value.trim();
+        if (!val) return;
+        remindersRef.push({ text: val, createdAt: Date.now() });
+        input.value = '';
+      };
 
-    function removeReminder(idx) {
-      const list = JSON.parse(localStorage.getItem('home_reminders') || '[]');
-      list.splice(idx, 1);
-      localStorage.setItem('home_reminders', JSON.stringify(list));
-      loadReminders();
+      window.removeReminder = function(key) {
+        remindersRef.child(key).remove();
+      };
+    } catch (e) {
+      console.error("Firebase 初始化錯誤:", e);
     }
 
     function handleEnter(e) {
-      if (e.key === 'Enter') addReminder();
+      if (e.key === 'Enter') window.addReminder();
     }
-
-    loadReminders();
   </script>
 </body>
 </html>
