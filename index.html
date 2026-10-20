@@ -285,7 +285,6 @@
     const remindersRef = db.ref('reminders');
     const busListRef = db.ref('bus_list');
 
-    // 預設巴士清單 (當 Firebase 仲未有資料時自動寫入)
     const DEFAULT_BUS_LIST = [
       {
         route: "297",
@@ -303,13 +302,11 @@
       }
     ];
 
-    let BUS_TRACK_LIST = []; // 由 Firebase 動態同步
+    let BUS_TRACK_LIST = [];
 
-    // 監聽雲端巴士清單
     busListRef.on('value', (snapshot) => {
       const data = snapshot.val();
       if (!data) {
-        // 如果雲端完全空白，自動初始化預設景林邨路線
         DEFAULT_BUS_LIST.forEach(item => busListRef.push(item));
         return;
       }
@@ -321,14 +318,13 @@
     });
 
     /* ================= 2. 互動式搜尋九巴路線及站點 ================= */
-    let allStopsCache = null; // 快取全港九巴站名，加速查詢
+    let allStopsCache = null;
 
     function toggleAddBusPanel() {
       const panel = document.getElementById('add-bus-panel');
       panel.classList.toggle('active');
     }
 
-    // 步驟 1：查詢該路線有邊幾個方向及服務類別
     async function searchRouteDirections() {
       const routeInput = document.getElementById('route-input').value.trim().toUpperCase();
       const msg = document.getElementById('bus-search-msg');
@@ -372,7 +368,6 @@
       }
     }
 
-    // 步驟 2：根據所選方向，列出沿途所有巴士站中文名
     async function loadRouteStops() {
       const dirVal = document.getElementById('dir-select').value;
       const stopRow = document.getElementById('stop-row');
@@ -389,7 +384,6 @@
       stopRow.style.display = 'none';
 
       try {
-        // 先載入全港站點名稱字典 (只載入一次並快取)
         if (!allStopsCache) {
           const allStopsRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/stop');
           const allStopsJson = await allStopsRes.json();
@@ -399,7 +393,6 @@
           });
         }
 
-        // 讀取該路線嘅站點順序
         const url = `https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${info.route}/${info.bound}/${info.service_type}`;
         const res = await fetch(url);
         const json = await res.json();
@@ -413,7 +406,7 @@
         stopSelect.innerHTML = '';
         routeStops.forEach(rs => {
           const stopName = allStopsCache[rs.stop] || rs.stop;
-          const cleanName = stopName.replace(/\s*\([A-Z0-9]+\)$/, ''); // 簡化顯示用
+          const cleanName = stopName.replace(/\s*\([A-Z0-9]+\)$/, '');
           const optionData = JSON.stringify({
             route: info.route,
             stop_id: rs.stop,
@@ -433,7 +426,6 @@
       }
     }
 
-    // 步驟 3：儲存新巴士線到 Firebase
     function confirmAddBus() {
       const stopVal = document.getElementById('stop-select').value;
       if (!stopVal) return;
@@ -447,7 +439,6 @@
         service_type: String(data.service_type)
       });
 
-      // 重置並收起面板
       document.getElementById('route-input').value = '';
       document.getElementById('dir-row').style.display = 'none';
       document.getElementById('stop-row').style.display = 'none';
@@ -455,15 +446,13 @@
       document.getElementById('add-bus-panel').classList.remove('active');
     }
 
-    // 刪除巴士路線
     function removeBusRoute(firebaseKey) {
       busListRef.child(firebaseKey).remove();
     }
 
-    /* ================= 3. 時間與日期 (連秒數) ================= */
+    /* ================= 3. 時間與日期 (12 小時制) ================= */
     function updateClock() {
       const now = new Date();
-      // 轉成 12 小時制 (會自動顯示 上午/下午 9:00:00)
       document.getElementById('clock').innerText = now.toLocaleTimeString('zh-HK', {
         hour12: true,
         hour: 'numeric',
@@ -477,18 +466,20 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-/* ================= 4. 天文台即時天氣 (支援落雨與天氣警告) ================= */
+    /* ================= 4. 天文台即時天氣 (支援雨量與警告) ================= */
     async function fetchWeather() {
       try {
-        // 1. 抓取分區氣溫、濕度及雨量
         const res = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc&t=${Date.now()}`);
         const data = await res.json();
 
-        // 2. 抓取即時生效的天氣警告 (如黃雨、紅雨、黑雨、雷暴警告等)
-        const warnRes = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc&t=${Date.now()}`);
-        const warnData = await warnRes.json();
+        let warnData = null;
+        try {
+          const warnRes = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc&t=${Date.now()}`);
+          warnData = await warnRes.json();
+        } catch (we) {
+          console.warn("警告信號抓取略過:", we);
+        }
 
-        // A. 處理氣溫與濕度 (鎖定將軍澳)
         let tkoTemp = '--';
         if (data.temperature && data.temperature.data.length > 0) {
           const tkoStation = data.temperature.data.find(d => d.place === '將軍澳') || data.temperature.data[0];
@@ -497,23 +488,20 @@
         }
         const humidity = data.humidity && data.humidity.data.length > 0 ? data.humidity.data[0].value : '--';
 
-        // B. 檢查將軍澳區是否正在落雨 (過去一小時降雨量)
         let rainText = '無雨';
         if (data.rainfall && data.rainfall.data) {
-          // 尋找「西貢」或「將軍澳」所屬區域雨量紀錄
           const tkoRain = data.rainfall.data.find(r => r.place === '西貢' || r.place === '將軍澳');
           if (tkoRain && tkoRain.max > 0) {
             rainText = `🌧️ 降雨: ${tkoRain.max}mm`;
           }
         }
 
-        // C. 檢查有無生效中的暴雨/天氣警告
         let warningBadge = '';
         if (warnData && typeof warnData === 'object') {
           const warnings = [];
-          if (warnData.WRAIN) warnings.push(`⚠️ ${warnData.WRAIN.name}`); // 黃雨/紅雨/黑雨
+          if (warnData.WRAIN) warnings.push(`⚠️ ${warnData.WRAIN.name}`);
           if (warnData.WTS) warnings.push('⚡ 雷暴警告');
-          if (warnData.WTCSGNL) warnings.push(`🌀 ${warnData.WTCSGNL.name}`); // 風球信號
+          if (warnData.WTCSGNL) warnings.push(`🌀 ${warnData.WTCSGNL.name}`);
           if (warnData.WFIRE) warnings.push(`🔥 火災危險`);
           if (warnData.WCOLD) warnings.push('❄️ 寒冷天氣');
           if (warnData.WHOT) warnings.push('☀️ 酷熱天氣');
@@ -523,13 +511,13 @@
           }
         }
 
-        // D. 更新顯示文字
         document.getElementById('weather-desc').innerHTML = `將軍澳 | 濕度: ${humidity}% | ${rainText} ${warningBadge}`;
-
       } catch (err) {
         console.error("天氣更新失敗:", err);
       }
     }
+    fetchWeather();
+    setInterval(fetchWeather, 5 * 60 * 1000); // 每 5 分鐘更新一次天氣
 
     /* ================= 5. 九巴實時到站時間 (每秒即時倒數版) ================= */
     let latestBusData = [];
