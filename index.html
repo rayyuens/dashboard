@@ -463,10 +463,13 @@
     /* ================= 3. 時間與日期 (連秒數) ================= */
     function updateClock() {
       const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      const ss = String(now.getSeconds()).padStart(2, '0');
-      document.getElementById('clock').innerText = `${hh}:${mm}:${ss}`;
+      // 轉成 12 小時制 (會自動顯示 上午/下午 9:00:00)
+      document.getElementById('clock').innerText = now.toLocaleTimeString('zh-HK', {
+        hour12: true,
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
+      });
 
       const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
       document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', options);
@@ -522,7 +525,7 @@
       }
 
       latestBusData = tempResults;
-      document.getElementById('eta-updated').innerText = `同步: ${new Date().toLocaleTimeString('zh-HK', { hour12: false })}`;
+      document.getElementById('eta-updated').innerText = `同步: ${new Date().toLocaleTimeString('zh-HK', { hour12: true })}`;
       renderBusETA();
     }
 
@@ -553,8 +556,7 @@
           item.etas.forEach((e, idx) => {
             const etaDate = new Date(e.eta);
             const diffSec = Math.floor((etaDate - now) / 1000);
-            const etaTimeStr = etaDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-
+            const etaTimeStr = etaDate.toLocaleTimeString('zh-HK', { hour: 'numeric', minute: '2-digit', hour12: true });
             let countdownText = '';
             let isUrgent = false;
 
