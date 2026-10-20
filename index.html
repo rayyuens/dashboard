@@ -477,23 +477,59 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    /* ================= 4. 天文台即時天氣 (優先讀取將軍澳站) ================= */
+/* ================= 4. 天文台即時天氣 (支援落雨與天氣警告) ================= */
     async function fetchWeather() {
       try {
+        // 1. 抓取分區氣溫、濕度及雨量
         const res = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc&t=${Date.now()}`);
         const data = await res.json();
+
+        // 2. 抓取即時生效的天氣警告 (如黃雨、紅雨、黑雨、雷暴警告等)
+        const warnRes = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc&t=${Date.now()}`);
+        const warnData = await warnRes.json();
+
+        // A. 處理氣溫與濕度 (鎖定將軍澳)
+        let tkoTemp = '--';
         if (data.temperature && data.temperature.data.length > 0) {
           const tkoStation = data.temperature.data.find(d => d.place === '將軍澳') || data.temperature.data[0];
-          const humidity = data.humidity.data[0].value;
-          document.getElementById('temp').innerText = `${tkoStation.value}°C`;
-          document.getElementById('weather-desc').innerText = `${tkoStation.place} | 濕度: ${humidity}%`;
+          tkoTemp = tkoStation.value;
+          document.getElementById('temp').innerText = `${tkoTemp}°C`;
         }
+        const humidity = data.humidity && data.humidity.data.length > 0 ? data.humidity.data[0].value : '--';
+
+        // B. 檢查將軍澳區是否正在落雨 (過去一小時降雨量)
+        let rainText = '無雨';
+        if (data.rainfall && data.rainfall.data) {
+          // 尋找「西貢」或「將軍澳」所屬區域雨量紀錄
+          const tkoRain = data.rainfall.data.find(r => r.place === '西貢' || r.place === '將軍澳');
+          if (tkoRain && tkoRain.max > 0) {
+            rainText = `🌧️ 降雨: ${tkoRain.max}mm`;
+          }
+        }
+
+        // C. 檢查有無生效中的暴雨/天氣警告
+        let warningBadge = '';
+        if (warnData && typeof warnData === 'object') {
+          const warnings = [];
+          if (warnData.WRAIN) warnings.push(`⚠️ ${warnData.WRAIN.name}`); // 黃雨/紅雨/黑雨
+          if (warnData.WTS) warnings.push('⚡ 雷暴警告');
+          if (warnData.WTCSGNL) warnings.push(`🌀 ${warnData.WTCSGNL.name}`); // 風球信號
+          if (warnData.WFIRE) warnings.push(`🔥 火災危險`);
+          if (warnData.WCOLD) warnings.push('❄️ 寒冷天氣');
+          if (warnData.WHOT) warnings.push('☀️ 酷熱天氣');
+
+          if (warnings.length > 0) {
+            warningBadge = `<span style="color:#ef4444; font-weight:bold; margin-left:0.5rem;">[${warnings.join(' ')}]</span>`;
+          }
+        }
+
+        // D. 更新顯示文字
+        document.getElementById('weather-desc').innerHTML = `將軍澳 | 濕度: ${humidity}% | ${rainText} ${warningBadge}`;
+
       } catch (err) {
         console.error("天氣更新失敗:", err);
       }
     }
-    fetchWeather();
-    setInterval(fetchWeather, 5 * 60 * 1000);
 
     /* ================= 5. 九巴實時到站時間 (每秒即時倒數版) ================= */
     let latestBusData = [];
