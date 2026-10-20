@@ -590,7 +590,7 @@
           // 特別天氣提示往往包含未來 1-2 小時定點降雨雷達預警
           rainTipEl.className = 'rain-tip danger';
           rainTipEl.innerText = `☔ 天文台短期提示：${swtData.swt[0].desc.slice(0, 28)}...`;
-        } else if (forecastPeriodText.includes('驟雨') || forecastPeriodText.includes('雷暴') || forecastPeriodText.includes('雨')) {
+        } else if (forecastPeriodText.includes('雷暴') || forecastPeriodText.includes('雨')) {
           rainTipEl.className = 'rain-tip warn';
           rainTipEl.innerText = `🌂 未來兩小時可能有驟雨，出門建議帶定摺遮`;
         } else {
