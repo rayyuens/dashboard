@@ -43,6 +43,31 @@
       display: flex;
       flex-direction: column;
       gap: 1.2rem;
+      transition: transform 1.5s ease;
+      overflow-x: hidden;
+    }
+
+    /* ================= 夜間防烙印與自動調暗遮罩 ================= */
+    #night-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.82);
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 1.2rem;
+    }
+    body.night-dimmed #night-overlay {
+      opacity: 1;
+    }
+    .night-hint {
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 0.82rem;
+      letter-spacing: 0.5px;
     }
 
     /* 頂部欄：時鐘與即時天氣 */
@@ -57,7 +82,21 @@
       gap: 1rem;
     }
     .time-box h1 { font-size: 3.2rem; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
-    .time-box p { font-size: 1.15rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .time-subrow { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.25rem; flex-wrap: wrap; }
+    .time-subrow p { font-size: 1.15rem; color: var(--text-muted); }
+    .btn-night-toggle {
+      background: #0f172a;
+      color: var(--text-muted);
+      border: 1px solid #334155;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .btn-night-toggle.active {
+      color: #facc15;
+      border-color: #eab308;
+    }
     
     .weather-box { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
     .weather-temp-row { display: flex; align-items: center; gap: 0.6rem; }
@@ -76,6 +115,59 @@
     .rain-tip.safe { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
     .rain-tip.warn { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
     .rain-tip.danger { background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); }
+
+    /* ================= 家庭公佈欄／頂部重要廣播 (Pinned Banner) ================= */
+    .pinned-banner {
+      display: none;
+      background: linear-gradient(90deg, rgba(234, 179, 8, 0.22), rgba(245, 158, 11, 0.12));
+      border: 2px solid #eab308;
+      border-radius: 1rem;
+      padding: 0.9rem 1.3rem;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      box-shadow: 0 0 20px rgba(234, 179, 8, 0.15);
+      animation: bannerPulse 3s infinite ease-in-out;
+    }
+    .pinned-banner.active { display: flex; }
+    @keyframes bannerPulse {
+      0%, 100% { border-color: #eab308; }
+      50% { border-color: #fde047; }
+    }
+    .pinned-content {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+    .pinned-tag {
+      background: #eab308;
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 0.5rem;
+      white-space: nowrap;
+    }
+    .pinned-text-list {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fef08a;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .pinned-unpin-btn {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(250, 204, 21, 0.5);
+      color: #fde047;
+      padding: 0.3rem 0.65rem;
+      border-radius: 0.45rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
 
     /* ================= 首頁：家庭群組選擇牆 ================= */
     #home-view {
@@ -369,7 +461,7 @@
     }
     .eta-urgent { background: var(--badge-green); color: black; font-weight: bold; }
 
-    /* 備忘錄 */
+    /* 備忘錄與釘選按鈕 */
     .reminder-input { display: flex; gap: 0.5rem; margin-bottom: 0.9rem; }
     .reminder-input input {
       flex: 1;
@@ -396,14 +488,39 @@
       background: #0f172a;
       padding: 0.65rem 0.85rem;
       border-radius: 0.5rem;
+      border: 1px solid transparent;
+      gap: 0.5rem;
     }
-    .reminder-item button {
+    .reminder-item.pinned {
+      border-color: rgba(234, 179, 8, 0.6);
+      background: rgba(234, 179, 8, 0.08);
+    }
+    .rem-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .btn-pin {
+      background: transparent;
+      border: 1px solid #334155;
+      color: var(--text-muted);
+      border-radius: 0.4rem;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .btn-pin.active {
+      background: rgba(234, 179, 8, 0.25);
+      border-color: #eab308;
+      color: #fde047;
+    }
+    .btn-del-rem {
       background: transparent;
       border: none;
       color: var(--badge-red);
       font-size: 1.05rem;
       cursor: pointer;
-      padding: 0 0.4rem;
+      padding: 0 0.35rem;
     }
 
     /* 底部：未來 5 天迷你天氣預報卡 */
@@ -434,11 +551,19 @@
 </head>
 <body>
 
+  <!-- 夜間自動調暗遮罩 (23:30 - 06:30 自動生效，輕觸畫面可喚醒 60 秒) -->
+  <div id="night-overlay">
+    <div class="night-hint">🌙 夜間護眼與防烙印模式生效中（輕觸螢幕可暫時喚醒 60 秒）</div>
+  </div>
+
   <!-- 頂部：時鐘、日期、即時天氣與未來兩小時降雨提示 (全站常駐) -->
   <div class="top-bar">
     <div class="time-box">
       <h1 id="clock">--:--:--</h1>
-      <p id="date">載入中...</p>
+      <div class="time-subrow">
+        <p id="date">載入中...</p>
+        <button class="btn-night-toggle" id="night-mode-btn" onclick="toggleManualNightMode(event)">🌙 夜間調暗: 自動</button>
+      </div>
     </div>
     <div class="weather-box">
       <div class="weather-temp-row">
@@ -482,7 +607,7 @@
     </div>
   </div>
 
-  <!-- ================= 畫面 B：群組內部 (獨立巴士路線 + 獨立備忘錄) ================= -->
+  <!-- ================= 畫面 B：群組內部 (獨立巴士路線 + 獨立備忘錄 + 置頂廣播) ================= -->
   <div id="group-view">
     <!-- 群組頂部切換列 -->
     <div class="group-nav-bar">
@@ -496,6 +621,14 @@
       <div class="nav-btn-group">
         <button class="btn-small primary" onclick="toggleInGroupEditPanel()">✎ 編輯群組名稱 / 圖示</button>
         <button class="btn-small" onclick="backToHomeGroups()">⬅ 切換家庭群組</button>
+      </div>
+    </div>
+
+    <!-- 📢 家庭公佈欄／頂部重要廣播 (當有備忘被 📌 釘選時自動彈出) -->
+    <div class="pinned-banner" id="pinned-banner">
+      <div class="pinned-content">
+        <span class="pinned-tag">📢 重要廣播</span>
+        <div class="pinned-text-list" id="pinned-banner-list"></div>
       </div>
     </div>
 
@@ -554,11 +687,11 @@
       <!-- 備忘錄 / Reminders -->
       <div class="card">
         <h2>
-          <span>📝 群組專屬備忘</span>
+          <span>📝 群組專屬備忘 <small style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(撳 📌 可置頂廣播)</small></span>
           <span class="last-update" id="db-status">🟢 已同步</span>
         </h2>
         <div class="reminder-input">
-          <input type="text" id="rem-input" placeholder="新增此群組嘅備忘..." onkeypress="handleEnter(event)">
+          <input type="text" id="rem-input" placeholder="新增備忘 (例如: 今晚唔返食飯)..." onkeypress="handleEnter(event)">
           <button onclick="addReminder()">新增</button>
         </div>
         <ul class="reminder-list" id="rem-list"></ul>
@@ -616,7 +749,6 @@
     let currentRemRef = null;
     let BUS_TRACK_LIST = [];
 
-    // 用於新增或編輯群組嘅暫存狀態
     let editingGroupId = null;
     let uploadedIconBase64 = "";
 
@@ -643,7 +775,6 @@
       }
     });
 
-    // 渲染首頁群組卡片 (連左上角編輯掣 ✎ 與右上角刪除掣 ✕)
     function renderGroupsGrid() {
       const grid = document.getElementById('groups-grid');
       let html = '';
@@ -667,7 +798,6 @@
       grid.innerHTML = html;
     }
 
-    // 首頁：開啟「新增群組」面板
     function openCreateGroupPanel() {
       editingGroupId = null;
       uploadedIconBase64 = "";
@@ -678,7 +808,6 @@
       document.getElementById('add-group-panel').classList.add('active');
     }
 
-    // 首頁：點擊卡片左上角「✎」編輯現有群組
     function openEditGroupOnHome(event, gid) {
       event.stopPropagation();
       const g = allGroupsData[gid];
@@ -698,7 +827,6 @@
       document.getElementById('add-group-panel').classList.remove('active');
     }
 
-    // 輔助函數：更新預覽圖示
     function setPreviewElement(elementId, iconData) {
       const el = document.getElementById(elementId);
       if (iconData) {
@@ -708,7 +836,6 @@
       }
     }
 
-    // 重置為預設 🏠 圖示
     function clearUploadedIcon(mode) {
       uploadedIconBase64 = "";
       if (mode === 'home') {
@@ -718,7 +845,6 @@
       }
     }
 
-    // 處理用戶上傳群組 Icon (自動縮圖轉 Base64)
     function handleGroupIconUpload(event, mode) {
       const file = event.target.files[0];
       if (!file) return;
@@ -752,20 +878,17 @@
       reader.readAsDataURL(file);
     }
 
-    // 首頁：儲存新增或修改嘅群組
     function saveGroupFromHome() {
       const nameInput = document.getElementById('group-name-input');
       const name = nameInput.value.trim();
       if (!name) return;
 
       if (editingGroupId) {
-        // 更新現有群組 (保留原本嘅 bus_list 同 reminders)
         groupsRef.child(editingGroupId).update({
           name: name,
           icon: uploadedIconBase64
         });
       } else {
-        // 新增群組
         groupsRef.push({
           name: name,
           icon: uploadedIconBase64 || "",
@@ -776,7 +899,6 @@
       closeGroupPanel();
     }
 
-    // 群組內部：展開/收起「編輯當前群組」面板
     function toggleInGroupEditPanel() {
       const panel = document.getElementById('in-group-edit-panel');
       if (panel.classList.contains('active')) {
@@ -792,7 +914,6 @@
       panel.classList.add('active');
     }
 
-    // 群組內部：儲存名稱與圖示修改
     function saveInGroupEdit() {
       if (!currentGroupId) return;
       const newName = document.getElementById('in-group-name-input').value.trim();
@@ -806,7 +927,6 @@
       document.getElementById('in-group-edit-panel').classList.remove('active');
     }
 
-    // 刪除家庭群組
     function deleteGroup(event, gid) {
       event.stopPropagation();
       const gname = allGroupsData[gid] ? allGroupsData[gid].name : '';
@@ -847,24 +967,59 @@
         fetchBusETA();
       });
 
+      // 監聽群組備忘與頂部置頂重要廣播 (Pinned Banner)
       currentRemRef = db.ref(`family_groups/${gid}/reminders`);
       currentRemRef.on('value', (snapshot) => {
         document.getElementById('db-status').innerText = '🟢 已同步';
         const data = snapshot.val();
         const ul = document.getElementById('rem-list');
-        ul.innerHTML = '';
+        const banner = document.getElementById('pinned-banner');
+        const bannerList = document.getElementById('pinned-banner-list');
 
-        if (!data) return;
+        ul.innerHTML = '';
+        bannerList.innerHTML = '';
+
+        if (!data) {
+          banner.classList.remove('active');
+          return;
+        }
+
+        const pinnedItems = [];
 
         Object.keys(data).forEach((key) => {
-          const itemText = data[key].text;
+          const item = data[key];
+          const itemText = item.text || '';
+          const isPinned = Boolean(item.pinned);
+
+          if (isPinned) {
+            pinnedItems.push({ key, text: itemText });
+          }
+
           ul.innerHTML += `
-            <li class="reminder-item">
+            <li class="reminder-item ${isPinned ? 'pinned' : ''}">
               <span>${itemText}</span>
-              <button onclick="removeReminder('${key}')">✕</button>
+              <div class="rem-actions">
+                <button class="btn-pin ${isPinned ? 'active' : ''}" title="置頂至頂部重要廣播" onclick="togglePinReminder('${key}', ${isPinned})">
+                  📌 ${isPinned ? '已置頂' : '釘選'}
+                </button>
+                <button class="btn-del-rem" title="刪除" onclick="removeReminder('${key}')">✕</button>
+              </div>
             </li>
           `;
         });
+
+        // 更新頂部重要廣播橫幅
+        if (pinnedItems.length > 0) {
+          banner.classList.add('active');
+          bannerList.innerHTML = pinnedItems.map(p => `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.8rem;">
+              <span>• ${p.text}</span>
+              <button class="pinned-unpin-btn" onclick="togglePinReminder('${p.key}', true)">取消置頂</button>
+            </div>
+          `).join('');
+        } else {
+          banner.classList.remove('active');
+        }
       });
     }
 
@@ -1029,7 +1184,64 @@
       currentBusRef.child(firebaseKey).remove();
     }
 
-    /* ================= 3. 時間與日期 (12 小時制) ================= */
+    /* ================= 3. 時間、夜間自動調暗、防烙印微移與凌晨自愈刷新 ================= */
+    let manualNightOverride = null; // null = 自動, true = 強制調暗, false = 強制正常
+    let temporaryWakeUntil = 0;     // 夜間觸碰螢幕暫時喚醒時間戳
+
+    function isNightHours(now) {
+      const totalMins = now.getHours() * 60 + now.getMinutes();
+      // 晚上 23:30 (1410) 至 早上 06:30 (390)
+      return totalMins >= 1410 || totalMins < 390;
+    }
+
+    function applyNightModeState(now) {
+      const btn = document.getElementById('night-mode-btn');
+      let shouldDim = false;
+
+      if (manualNightOverride === true) {
+        shouldDim = true;
+        btn.innerText = '🌙 夜間調暗: 強制開啟';
+        btn.classList.add('active');
+      } else if (manualNightOverride === false) {
+        shouldDim = false;
+        btn.innerText = '☀️ 夜間調暗: 強制關閉';
+        btn.classList.remove('active');
+      } else {
+        shouldDim = isNightHours(now);
+        btn.innerText = '🌙 夜間調暗: 自動 (23:30-06:30)';
+        btn.classList.toggle('active', shouldDim);
+      }
+
+      // 如果處於夜間調暗，但用戶啱啱篤咗一下螢幕，暫時喚醒 60 秒
+      if (shouldDim && Date.now() < temporaryWakeUntil) {
+        document.body.classList.remove('night-dimmed');
+      } else {
+        document.body.classList.toggle('night-dimmed', shouldDim);
+      }
+    }
+
+    // 切換頂部「夜間調暗」模式按鈕 (自動 -> 強制開啟 -> 強制關閉 -> 自動)
+    function toggleManualNightMode(e) {
+      e.stopPropagation();
+      if (manualNightOverride === null) {
+        manualNightOverride = true;
+      } else if (manualNightOverride === true) {
+        manualNightOverride = false;
+      } else {
+        manualNightOverride = null;
+      }
+      temporaryWakeUntil = 0;
+      applyNightModeState(new Date());
+    }
+
+    // 夜間模式下輕觸螢幕任何地方，暫時喚醒畫面 60 秒方便睇嘢
+    document.addEventListener('click', () => {
+      if (document.body.classList.contains('night-dimmed')) {
+        temporaryWakeUntil = Date.now() + 60000;
+        document.body.classList.remove('night-dimmed');
+      }
+    });
+
     function updateClock() {
       const now = new Date();
       document.getElementById('clock').innerText = now.toLocaleTimeString('zh-HK', {
@@ -1041,9 +1253,31 @@
 
       const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
       document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', options);
+
+      // 檢查夜間自動調暗
+      applyNightModeState(now);
+
+      // 自愈性定時自動重新整理：每日凌晨 04:30:05 自動 Reload 一次，防止 iPad 長開記憶體溢出
+      if (now.getHours() === 4 && now.getMinutes() === 30 && now.getSeconds() === 5) {
+        window.location.reload();
+      }
     }
     setInterval(updateClock, 1000);
     updateClock();
+
+    // OLED / LCD 防烙印像素微移 (每 10 分鐘極輕微移動 1~2px)
+    let shiftStep = 0;
+    const shiftOffsets = [
+      'translate(0px, 0px)',
+      'translate(2px, 1px)',
+      'translate(-1px, 2px)',
+      'translate(-2px, -1px)',
+      'translate(1px, -2px)'
+    ];
+    setInterval(() => {
+      shiftStep = (shiftStep + 1) % shiftOffsets.length;
+      document.body.style.transform = shiftOffsets[shiftStep];
+    }, 600000); // 600,000ms = 10 分鐘
 
     /* ================= 4. 天文台即時天氣 + 未來兩小時帶遮建議 + 5天預報 ================= */
     async function fetchWeather() {
@@ -1248,14 +1482,25 @@
     setInterval(fetchBusETA, 15000); // 每 15 秒向九巴攞一次新資料
     setInterval(renderBusETA, 1000); // 每 1 秒更新畫面倒數
 
-    /* ================= 6. 群組專屬備忘錄操作 ================= */
+    /* ================= 6. 群組專屬備忘錄與置頂廣播操作 ================= */
     window.addReminder = function() {
       if (!currentRemRef) return;
       const input = document.getElementById('rem-input');
       const val = input.value.trim();
       if (!val) return;
-      currentRemRef.push({ text: val, createdAt: Date.now() });
+      currentRemRef.push({
+        text: val,
+        pinned: false,
+        createdAt: Date.now()
+      });
       input.value = '';
+    };
+
+    window.togglePinReminder = function(key, currentPinnedState) {
+      if (!currentRemRef) return;
+      currentRemRef.child(key).update({
+        pinned: !currentPinnedState
+      });
     };
 
     window.removeReminder = function(key) {
