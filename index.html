@@ -133,8 +133,24 @@
       border: 1px solid rgba(239, 68, 68, 0.4);
       color: var(--badge-red);
       border-radius: 50%;
-      width: 26px;
-      height: 26px;
+      width: 28px;
+      height: 28px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-edit-group-card {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: var(--accent);
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
       font-size: 0.8rem;
       cursor: pointer;
       display: flex;
@@ -142,7 +158,7 @@
       justify-content: center;
     }
 
-    /* 新增群組面板 */
+    /* 新增/編輯群組面板 */
     .add-group-panel {
       display: none;
       background: #0f172a;
@@ -197,6 +213,8 @@
       padding: 0.8rem 1.3rem;
       border-radius: 1rem;
       border: 1px solid #334155;
+      flex-wrap: wrap;
+      gap: 0.8rem;
     }
     .current-group-badge {
       display: flex;
@@ -204,8 +222,8 @@
       gap: 0.75rem;
     }
     .current-group-badge img, .current-group-badge .emoji-avatar {
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
       object-fit: cover;
       border: 2px solid var(--accent);
@@ -219,6 +237,11 @@
       font-size: 1.25rem;
       font-weight: 800;
       color: var(--accent);
+    }
+    .nav-btn-group {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
     }
 
     /* 中間主區域：巴士 + 備忘 */
@@ -266,6 +289,7 @@
       font-weight: 600;
     }
     .btn-small.primary { background: var(--accent); color: #0f172a; }
+    .btn-small.danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
 
     /* 新增巴士路線面板 */
     .add-bus-panel {
@@ -430,22 +454,24 @@
     <div class="card" style="flex:1;">
       <h2>
         <span>👨‍👩‍👧‍👦 選擇家庭群組 / 成員面板</span>
-        <button class="btn-small primary" onclick="toggleAddGroupPanel()">＋ 新增群組</button>
+        <button class="btn-small primary" onclick="openCreateGroupPanel()">＋ 新增群組</button>
       </h2>
 
-      <!-- 新增家庭群組表單 -->
+      <!-- 新增 / 編輯家庭群組表單 -->
       <div class="add-group-panel" id="add-group-panel">
+        <div style="font-weight:bold; color:var(--accent);" id="group-form-title">建立新家庭群組</div>
         <div class="avatar-upload-row">
           <div id="group-avatar-preview" class="avatar-preview">🏠</div>
           <label class="file-label">
-            📷 上傳群組圖片 / Icon
-            <input type="file" id="group-icon-input" accept="image/*" style="display:none;" onchange="handleGroupIconUpload(event)">
+            📷 上傳 / 更換圖片
+            <input type="file" id="group-icon-input" accept="image/*" style="display:none;" onchange="handleGroupIconUpload(event, 'home')">
           </label>
-          <span style="font-size:0.8rem; color:var(--text-muted);">（可選，唔上傳會用預設屋企圖示）</span>
+          <button class="btn-small danger" onclick="clearUploadedIcon('home')">重置預設圖示 🏠</button>
         </div>
         <div class="form-row">
           <input type="text" id="group-name-input" placeholder="輸入群組名稱 (例如: 屋企大廳、返工專區、爸媽專用)">
-          <button onclick="createNewGroup()">確認建立</button>
+          <button onclick="saveGroupFromHome()" id="group-form-submit-btn">確認建立</button>
+          <button class="btn-small" onclick="closeGroupPanel()">取消</button>
         </div>
       </div>
 
@@ -467,7 +493,28 @@
           <div class="current-group-title" id="active-group-name">--</div>
         </div>
       </div>
-      <button class="btn-small" onclick="backToHomeGroups()">⬅ 切換家庭群組</button>
+      <div class="nav-btn-group">
+        <button class="btn-small primary" onclick="toggleInGroupEditPanel()">✎ 編輯群組名稱 / 圖示</button>
+        <button class="btn-small" onclick="backToHomeGroups()">⬅ 切換家庭群組</button>
+      </div>
+    </div>
+
+    <!-- 群組內部直接修改名稱與圖示面板 -->
+    <div class="add-group-panel" id="in-group-edit-panel">
+      <div style="font-weight:bold; color:var(--accent);">✎ 修改當前群組名稱與圖示</div>
+      <div class="avatar-upload-row">
+        <div id="in-group-avatar-preview" class="avatar-preview">🏠</div>
+        <label class="file-label">
+          📷 更換新圖片
+          <input type="file" id="in-group-icon-input" accept="image/*" style="display:none;" onchange="handleGroupIconUpload(event, 'ingroup')">
+        </label>
+        <button class="btn-small danger" onclick="clearUploadedIcon('ingroup')">重置為預設 🏠</button>
+      </div>
+      <div class="form-row">
+        <input type="text" id="in-group-name-input" placeholder="輸入新群組名稱">
+        <button onclick="saveInGroupEdit()">儲存修改</button>
+        <button class="btn-small" onclick="toggleInGroupEditPanel()">取消</button>
+      </div>
     </div>
 
     <!-- 中間：巴士到站 + 家居備忘 -->
@@ -568,13 +615,15 @@
     let currentBusRef = null;
     let currentRemRef = null;
     let BUS_TRACK_LIST = [];
-    let uploadedIconBase64 = null;
+
+    // 用於新增或編輯群組嘅暫存狀態
+    let editingGroupId = null;
+    let uploadedIconBase64 = "";
 
     // 監聽所有家庭群組
     groupsRef.on('value', (snapshot) => {
       const data = snapshot.val();
       if (!data) {
-        // 第一次使用：自動建立預設「屋企主頁 (景林邨)」群組並放入 297 及 93A
         const newGroupRef = groupsRef.push({
           name: "屋企大廳 (景林邨)",
           icon: "",
@@ -587,16 +636,14 @@
       allGroupsData = data;
       renderGroupsGrid();
 
-      // 如果之前揀過某個群組而且該群組仲存在，自動打開或更新標題
       if (currentGroupId && allGroupsData[currentGroupId]) {
         updateActiveGroupHeader(allGroupsData[currentGroupId]);
       } else if (currentGroupId && !allGroupsData[currentGroupId]) {
-        // 如果當前群組喺其他機被刪除，自動退回首頁
         backToHomeGroups();
       }
     });
 
-    // 渲染首頁群組卡片
+    // 渲染首頁群組卡片 (連左上角編輯掣 ✎ 與右上角刪除掣 ✕)
     function renderGroupsGrid() {
       const grid = document.getElementById('groups-grid');
       let html = '';
@@ -609,7 +656,8 @@
 
         html += `
           <div class="group-card" onclick="enterGroup('${gid}')">
-            <button class="btn-del-group" title="刪除群組" onclick="deleteGroup(event, '${gid}', '${g.name}')">✕</button>
+            <button class="btn-edit-group-card" title="修改名稱與圖示" onclick="openEditGroupOnHome(event, '${gid}')">✎</button>
+            <button class="btn-del-group" title="刪除群組" onclick="deleteGroup(event, '${gid}')">✕</button>
             ${avatarHtml}
             <div class="group-name">${g.name}</div>
           </div>
@@ -619,13 +667,59 @@
       grid.innerHTML = html;
     }
 
-    // 展開/收起新增群組面板
-    function toggleAddGroupPanel() {
-      document.getElementById('add-group-panel').classList.toggle('active');
+    // 首頁：開啟「新增群組」面板
+    function openCreateGroupPanel() {
+      editingGroupId = null;
+      uploadedIconBase64 = "";
+      document.getElementById('group-form-title').innerText = '＋ 建立新家庭群組';
+      document.getElementById('group-form-submit-btn').innerText = '確認建立';
+      document.getElementById('group-name-input').value = '';
+      setPreviewElement('group-avatar-preview', '');
+      document.getElementById('add-group-panel').classList.add('active');
     }
 
-    // 處理用戶上傳群組 Icon (自動縮圖轉 Base64，免付費 Storage)
-    function handleGroupIconUpload(event) {
+    // 首頁：點擊卡片左上角「✎」編輯現有群組
+    function openEditGroupOnHome(event, gid) {
+      event.stopPropagation();
+      const g = allGroupsData[gid];
+      if (!g) return;
+
+      editingGroupId = gid;
+      uploadedIconBase64 = g.icon || "";
+      document.getElementById('group-form-title').innerText = `✎ 編輯群組：${g.name}`;
+      document.getElementById('group-form-submit-btn').innerText = '儲存修改';
+      document.getElementById('group-name-input').value = g.name;
+      setPreviewElement('group-avatar-preview', uploadedIconBase64);
+      document.getElementById('add-group-panel').classList.add('active');
+    }
+
+    function closeGroupPanel() {
+      editingGroupId = null;
+      document.getElementById('add-group-panel').classList.remove('active');
+    }
+
+    // 輔助函數：更新預覽圖示
+    function setPreviewElement(elementId, iconData) {
+      const el = document.getElementById(elementId);
+      if (iconData) {
+        el.outerHTML = `<img id="${elementId}" class="avatar-preview" src="${iconData}">`;
+      } else {
+        el.outerHTML = `<div id="${elementId}" class="avatar-preview">🏠</div>`;
+      }
+    }
+
+    // 重置為預設 🏠 圖示
+    function clearUploadedIcon(mode) {
+      uploadedIconBase64 = "";
+      if (mode === 'home') {
+        setPreviewElement('group-avatar-preview', '');
+      } else {
+        setPreviewElement('in-group-avatar-preview', '');
+      }
+    }
+
+    // 處理用戶上傳群組 Icon (自動縮圖轉 Base64)
+    function handleGroupIconUpload(event, mode) {
       const file = event.target.files[0];
       if (!file) return;
 
@@ -650,35 +744,72 @@
           ctx.drawImage(img, 0, 0, w, h);
 
           uploadedIconBase64 = canvas.toDataURL('image/jpeg', 0.8);
-          const preview = document.getElementById('group-avatar-preview');
-          preview.outerHTML = `<img id="group-avatar-preview" class="avatar-preview" src="${uploadedIconBase64}">`;
+          const targetPreviewId = mode === 'home' ? 'group-avatar-preview' : 'in-group-avatar-preview';
+          setPreviewElement(targetPreviewId, uploadedIconBase64);
         };
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
 
-    // 建立新家庭群組
-    function createNewGroup() {
+    // 首頁：儲存新增或修改嘅群組
+    function saveGroupFromHome() {
       const nameInput = document.getElementById('group-name-input');
       const name = nameInput.value.trim();
       if (!name) return;
 
-      groupsRef.push({
-        name: name,
-        icon: uploadedIconBase64 || "",
-        createdAt: Date.now()
+      if (editingGroupId) {
+        // 更新現有群組 (保留原本嘅 bus_list 同 reminders)
+        groupsRef.child(editingGroupId).update({
+          name: name,
+          icon: uploadedIconBase64
+        });
+      } else {
+        // 新增群組
+        groupsRef.push({
+          name: name,
+          icon: uploadedIconBase64 || "",
+          createdAt: Date.now()
+        });
+      }
+
+      closeGroupPanel();
+    }
+
+    // 群組內部：展開/收起「編輯當前群組」面板
+    function toggleInGroupEditPanel() {
+      const panel = document.getElementById('in-group-edit-panel');
+      if (panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        return;
+      }
+      if (!currentGroupId || !allGroupsData[currentGroupId]) return;
+
+      const g = allGroupsData[currentGroupId];
+      uploadedIconBase64 = g.icon || "";
+      document.getElementById('in-group-name-input').value = g.name;
+      setPreviewElement('in-group-avatar-preview', uploadedIconBase64);
+      panel.classList.add('active');
+    }
+
+    // 群組內部：儲存名稱與圖示修改
+    function saveInGroupEdit() {
+      if (!currentGroupId) return;
+      const newName = document.getElementById('in-group-name-input').value.trim();
+      if (!newName) return;
+
+      groupsRef.child(currentGroupId).update({
+        name: newName,
+        icon: uploadedIconBase64
       });
 
-      nameInput.value = '';
-      uploadedIconBase64 = null;
-      document.getElementById('group-avatar-preview').outerHTML = `<div id="group-avatar-preview" class="avatar-preview">🏠</div>`;
-      document.getElementById('add-group-panel').classList.remove('active');
+      document.getElementById('in-group-edit-panel').classList.remove('active');
     }
 
     // 刪除家庭群組
-    function deleteGroup(event, gid, gname) {
-      event.stopPropagation(); // 防止觸發進入群組
+    function deleteGroup(event, gid) {
+      event.stopPropagation();
+      const gname = allGroupsData[gid] ? allGroupsData[gid].name : '';
       if (confirm(`確定要刪除「${gname}」群組及其所有巴士與備忘資料嗎？`)) {
         groupsRef.child(gid).remove();
       }
@@ -688,7 +819,6 @@
     function enterGroup(gid) {
       if (!allGroupsData[gid]) return;
 
-      // 解除舊群組嘅 Firebase 監聽器
       if (currentBusRef) currentBusRef.off();
       if (currentRemRef) currentRemRef.off();
 
@@ -696,11 +826,11 @@
       localStorage.setItem('active_family_group_id', gid);
 
       document.getElementById('home-view').style.display = 'none';
+      document.getElementById('in-group-edit-panel').classList.remove('active');
       document.getElementById('group-view').style.display = 'flex';
 
       updateActiveGroupHeader(allGroupsData[gid]);
 
-      // 綁定該群組專屬嘅 bus_list
       currentBusRef = db.ref(`family_groups/${gid}/bus_list`);
       currentBusRef.on('value', (snapshot) => {
         const data = snapshot.val();
@@ -717,7 +847,6 @@
         fetchBusETA();
       });
 
-      // 綁定該群組專屬嘅 reminders
       currentRemRef = db.ref(`family_groups/${gid}/reminders`);
       currentRemRef.on('value', (snapshot) => {
         document.getElementById('db-status').innerText = '🟢 已同步';
@@ -749,7 +878,6 @@
       }
     }
 
-    // 返回首頁群組選擇牆
     function backToHomeGroups() {
       if (currentBusRef) currentBusRef.off();
       if (currentRemRef) currentRemRef.off();
@@ -760,7 +888,6 @@
       document.getElementById('home-view').style.display = 'flex';
     }
 
-    // 頁面初次載入時，如果之前停留在某個群組，等資料一到就自動進入
     groupsRef.once('value', (snap) => {
       const val = snap.val();
       if (currentGroupId && val && val[currentGroupId]) {
@@ -1024,8 +1151,8 @@
 
     fetchWeather();
     fetch5DayForecast();
-    setInterval(fetchWeather, 300000);       // 每 5 分鐘 (300,000ms) 更新即時天氣
-    setInterval(fetch5DayForecast, 1800000); // 每 30 分鐘 (1,800,000ms) 更新 5 天預報
+    setInterval(fetchWeather, 300000);       // 每 5 分鐘更新即時天氣
+    setInterval(fetch5DayForecast, 1800000); // 每 30 分鐘更新 5 天預報
 
     /* ================= 5. 九巴實時到站時間 (每秒即時倒數版) ================= */
     let latestBusData = [];
@@ -1118,7 +1245,7 @@
       container.innerHTML = html;
     }
 
-    setInterval(fetchBusETA, 15000); // 每 15 秒 (15,000ms) 向九巴攞一次新資料
+    setInterval(fetchBusETA, 15000); // 每 15 秒向九巴攞一次新資料
     setInterval(renderBusETA, 1000); // 每 1 秒更新畫面倒數
 
     /* ================= 6. 群組專屬備忘錄操作 ================= */
