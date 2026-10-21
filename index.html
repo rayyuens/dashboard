@@ -116,7 +116,7 @@
     .rain-tip.warn { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
     .rain-tip.danger { background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); }
 
-    /* ================= 家庭公佈欄／頂部重要廣播 (Pinned Banner) ================= */
+    /* ================= 全域共用家庭廣播橫幅 (全站常駐) ================= */
     .pinned-banner {
       display: none;
       background: linear-gradient(90deg, rgba(234, 179, 8, 0.22), rgba(245, 158, 11, 0.12));
@@ -151,12 +151,13 @@
       white-space: nowrap;
     }
     .pinned-text-list {
-      font-size: 1.2rem;
+      font-size: 1.15rem;
       font-weight: 700;
       color: #fef08a;
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
+      flex: 1;
     }
     .pinned-unpin-btn {
       background: rgba(15, 23, 42, 0.6);
@@ -551,7 +552,7 @@
 </head>
 <body>
 
-  <!-- 夜間自動調暗遮罩 (23:30 - 06:30 自動生效，輕觸畫面可喚醒 60 秒) -->
+  <!-- 夜間自動調暗遮罩 -->
   <div id="night-overlay">
     <div class="night-hint">🌙 夜間護眼與防烙印模式生效中（輕觸螢幕可暫時喚醒 60 秒）</div>
   </div>
@@ -571,6 +572,14 @@
       </div>
       <div class="weather-info" id="weather-desc">載入天氣中...</div>
       <div class="rain-tip" id="rain-tip">🌂 正在分析降雨預報...</div>
+    </div>
+  </div>
+
+  <!-- 📢 全域共用家庭廣播橫幅 (全站常駐，無論身處首頁或任何群組都睇到) -->
+  <div class="pinned-banner" id="global-pinned-banner">
+    <div class="pinned-content">
+      <span class="pinned-tag">📢 全屋重要廣播</span>
+      <div class="pinned-text-list" id="global-pinned-banner-list"></div>
     </div>
   </div>
 
@@ -607,7 +616,7 @@
     </div>
   </div>
 
-  <!-- ================= 畫面 B：群組內部 (獨立巴士路線 + 獨立備忘錄 + 置頂廣播) ================= -->
+  <!-- ================= 畫面 B：群組內部 (獨立巴士路線 + 獨立備忘錄) ================= -->
   <div id="group-view">
     <!-- 群組頂部切換列 -->
     <div class="group-nav-bar">
@@ -621,14 +630,6 @@
       <div class="nav-btn-group">
         <button class="btn-small primary" onclick="toggleInGroupEditPanel()">✎ 編輯群組名稱 / 圖示</button>
         <button class="btn-small" onclick="backToHomeGroups()">⬅ 切換家庭群組</button>
-      </div>
-    </div>
-
-    <!-- 📢 家庭公佈欄／頂部重要廣播 (當有備忘被 📌 釘選時自動彈出) -->
-    <div class="pinned-banner" id="pinned-banner">
-      <div class="pinned-content">
-        <span class="pinned-tag">📢 重要廣播</span>
-        <div class="pinned-text-list" id="pinned-banner-list"></div>
       </div>
     </div>
 
@@ -687,7 +688,7 @@
       <!-- 備忘錄 / Reminders -->
       <div class="card">
         <h2>
-          <span>📝 群組專屬備忘 <small style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(撳 📌 可置頂廣播)</small></span>
+          <span>📝 群組專屬備忘 <small style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(撳 📌 可全屋廣播)</small></span>
           <span class="last-update" id="db-status">🟢 已同步</span>
         </h2>
         <div class="reminder-input">
@@ -725,6 +726,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const groupsRef = db.ref('family_groups');
+    const globalBroadcastsRef = db.ref('global_broadcasts'); // 全域廣播資料庫節點
 
     const DEFAULT_BUS_LIST = [
       {
@@ -751,6 +753,36 @@
 
     let editingGroupId = null;
     let uploadedIconBase64 = "";
+
+    // 實時監聽全域共用廣播（全屋成員無論喺首頁定任何群組都同步睇到）
+    globalBroadcastsRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      const banner = document.getElementById('global-pinned-banner');
+      const bannerList = document.getElementById('global-pinned-banner-list');
+      bannerList.innerHTML = '';
+
+      if (!data) {
+        banner.classList.remove('active');
+        return;
+      }
+
+      const items = [];
+      Object.keys(data).forEach(key => {
+        items.push({ key, text: data[key].text, groupName: data[key].groupName || '屋企' });
+      });
+
+      if (items.length > 0) {
+        banner.classList.add('active');
+        bannerList.innerHTML = items.map(p => `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:0.8rem; width:100%;">
+            <span>• [${p.groupName}] ${p.text}</span>
+            <button class="pinned-unpin-btn" onclick="removeGlobalBroadcast('${p.key}')">收到 / 移除</button>
+          </div>
+        `).join('');
+      } else {
+        banner.classList.remove('active');
+      }
+    });
 
     // 監聽所有家庭群組
     groupsRef.on('value', (snapshot) => {
@@ -957,7 +989,7 @@
         if (!data) {
           BUS_TRACK_LIST = [];
           latestBusData = [];
-          document.getElementById('bus-container').innerHTML = '<div style="color:#64748b;">此群組暫無巴士路線，請按右上角「＋ 新增路線」</div>';
+          document.getElementById('bus-container').innerHTML = '<div style="color:#64748b;">此群組暫無監察路線，請按右上角「＋ 新增路線」</div>';
           return;
         }
         BUS_TRACK_LIST = Object.keys(data).map(key => ({
@@ -967,59 +999,33 @@
         fetchBusETA();
       });
 
-      // 監聽群組備忘與頂部置頂重要廣播 (Pinned Banner)
+      // 監聽群組備忘
       currentRemRef = db.ref(`family_groups/${gid}/reminders`);
       currentRemRef.on('value', (snapshot) => {
         document.getElementById('db-status').innerText = '🟢 已同步';
         const data = snapshot.val();
         const ul = document.getElementById('rem-list');
-        const banner = document.getElementById('pinned-banner');
-        const bannerList = document.getElementById('pinned-banner-list');
-
         ul.innerHTML = '';
-        bannerList.innerHTML = '';
 
-        if (!data) {
-          banner.classList.remove('active');
-          return;
-        }
-
-        const pinnedItems = [];
+        if (!data) return;
 
         Object.keys(data).forEach((key) => {
           const item = data[key];
           const itemText = item.text || '';
           const isPinned = Boolean(item.pinned);
 
-          if (isPinned) {
-            pinnedItems.push({ key, text: itemText });
-          }
-
           ul.innerHTML += `
             <li class="reminder-item ${isPinned ? 'pinned' : ''}">
               <span>${itemText}</span>
               <div class="rem-actions">
-                <button class="btn-pin ${isPinned ? 'active' : ''}" title="置頂至頂部重要廣播" onclick="togglePinReminder('${key}', ${isPinned})">
-                  📌 ${isPinned ? '已置頂' : '釘選'}
+                <button class="btn-pin ${isPinned ? 'active' : ''}" title="全屋廣播此備忘" onclick="toggleGlobalBroadcast('${key}', '${itemText.replace(/'/g, "\\'")}', ${isPinned})">
+                  📌 ${isPinned ? '已廣播' : '廣播'}
                 </button>
                 <button class="btn-del-rem" title="刪除" onclick="removeReminder('${key}')">✕</button>
               </div>
             </li>
           `;
         });
-
-        // 更新頂部重要廣播橫幅
-        if (pinnedItems.length > 0) {
-          banner.classList.add('active');
-          bannerList.innerHTML = pinnedItems.map(p => `
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.8rem;">
-              <span>• ${p.text}</span>
-              <button class="pinned-unpin-btn" onclick="togglePinReminder('${p.key}', true)">取消置頂</button>
-            </div>
-          `).join('');
-        } else {
-          banner.classList.remove('active');
-        }
       });
     }
 
@@ -1185,12 +1191,11 @@
     }
 
     /* ================= 3. 時間、夜間自動調暗、防烙印微移與凌晨自愈刷新 ================= */
-    let manualNightOverride = null; // null = 自動, true = 強制調暗, false = 強制正常
-    let temporaryWakeUntil = 0;     // 夜間觸碰螢幕暫時喚醒時間戳
+    let manualNightOverride = null;
+    let temporaryWakeUntil = 0;
 
     function isNightHours(now) {
       const totalMins = now.getHours() * 60 + now.getMinutes();
-      // 晚上 23:30 (1410) 至 早上 06:30 (390)
       return totalMins >= 1410 || totalMins < 390;
     }
 
@@ -1212,7 +1217,6 @@
         btn.classList.toggle('active', shouldDim);
       }
 
-      // 如果處於夜間調暗，但用戶啱啱篤咗一下螢幕，暫時喚醒 60 秒
       if (shouldDim && Date.now() < temporaryWakeUntil) {
         document.body.classList.remove('night-dimmed');
       } else {
@@ -1220,7 +1224,6 @@
       }
     }
 
-    // 切換頂部「夜間調暗」模式按鈕 (自動 -> 強制開啟 -> 強制關閉 -> 自動)
     function toggleManualNightMode(e) {
       e.stopPropagation();
       if (manualNightOverride === null) {
@@ -1234,7 +1237,6 @@
       applyNightModeState(new Date());
     }
 
-    // 夜間模式下輕觸螢幕任何地方，暫時喚醒畫面 60 秒方便睇嘢
     document.addEventListener('click', () => {
       if (document.body.classList.contains('night-dimmed')) {
         temporaryWakeUntil = Date.now() + 60000;
@@ -1254,10 +1256,8 @@
       const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
       document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', options);
 
-      // 檢查夜間自動調暗
       applyNightModeState(now);
 
-      // 自愈性定時自動重新整理：每日凌晨 04:30:05 自動 Reload 一次，防止 iPad 長開記憶體溢出
       if (now.getHours() === 4 && now.getMinutes() === 30 && now.getSeconds() === 5) {
         window.location.reload();
       }
@@ -1265,7 +1265,6 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // OLED / LCD 防烙印像素微移 (每 10 分鐘極輕微移動 1~2px)
     let shiftStep = 0;
     const shiftOffsets = [
       'translate(0px, 0px)',
@@ -1277,7 +1276,7 @@
     setInterval(() => {
       shiftStep = (shiftStep + 1) % shiftOffsets.length;
       document.body.style.transform = shiftOffsets[shiftStep];
-    }, 600000); // 600,000ms = 10 分鐘
+    }, 600000);
 
     /* ================= 4. 天文台即時天氣 + 未來兩小時帶遮建議 + 5天預報 ================= */
     async function fetchWeather() {
@@ -1385,8 +1384,8 @@
 
     fetchWeather();
     fetch5DayForecast();
-    setInterval(fetchWeather, 300000);       // 每 5 分鐘更新即時天氣
-    setInterval(fetch5DayForecast, 1800000); // 每 30 分鐘更新 5 天預報
+    setInterval(fetchWeather, 300000);
+    setInterval(fetch5DayForecast, 1800000);
 
     /* ================= 5. 九巴實時到站時間 (每秒即時倒數版) ================= */
     let latestBusData = [];
@@ -1479,10 +1478,10 @@
       container.innerHTML = html;
     }
 
-    setInterval(fetchBusETA, 15000); // 每 15 秒向九巴攞一次新資料
-    setInterval(renderBusETA, 1000); // 每 1 秒更新畫面倒數
+    setInterval(fetchBusETA, 15000);
+    setInterval(renderBusETA, 1000);
 
-    /* ================= 6. 群組專屬備忘錄與置頂廣播操作 ================= */
+    /* ================= 6. 群組專屬備忘錄與全域廣播操作 ================= */
     window.addReminder = function() {
       if (!currentRemRef) return;
       const input = document.getElementById('rem-input');
@@ -1490,22 +1489,34 @@
       if (!val) return;
       currentRemRef.push({
         text: val,
-        pinned: false,
         createdAt: Date.now()
       });
       input.value = '';
     };
 
-    window.togglePinReminder = function(key, currentPinnedState) {
-      if (!currentRemRef) return;
-      currentRemRef.child(key).update({
-        pinned: !currentPinnedState
+    // 點擊「廣播」：將該備忘推送到全域廣播節點，全屋所有頁面即時彈出
+    window.toggleGlobalBroadcast = function(key, text) {
+      if (!currentGroupId || !allGroupsData[currentGroupId]) return;
+      const groupName = allGroupsData[currentGroupId].name;
+
+      // 用備忘嘅 key 作為 global_broadcasts 嘅 ID，避免重複
+      globalBroadcastsRef.child(key).set({
+        text: text,
+        groupName: groupName,
+        createdAt: Date.now()
       });
+    };
+
+    // 點擊「收到 / 移除」：清除該條全域廣播
+    window.removeGlobalBroadcast = function(key) {
+      globalBroadcastsRef.child(key).remove();
     };
 
     window.removeReminder = function(key) {
       if (!currentRemRef) return;
       currentRemRef.child(key).remove();
+      // 同時如果呢個備忘之前有發佈到全域廣播，順便清除埋
+      globalBroadcastsRef.child(key).remove();
     };
 
     function handleEnter(e) {
