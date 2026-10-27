@@ -89,11 +89,13 @@
     }
     .header-actions { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
     .last-update { font-size: 0.78rem; color: #94a3b8; font-weight: normal; margin-right: 0.6rem; }
-    .btn-small { background: #334155; color: #f8fafc; border: none; padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-size: 0.82rem; cursor: pointer; font-weight: 600; }
+    .btn-small { background: #334155; color: #f8fafc; border: none; padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-size: 0.8rem; cursor: pointer; font-weight: 600; margin-left: 0.35rem; }
+    .btn-small:first-child { margin-left: 0; }
     .btn-small.primary { background: #38bdf8; color: #0f172a; }
+    .btn-small.accent { background: #0f172a; color: #38bdf8; border: 1px solid #38bdf8; }
     .btn-small.danger { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); }
 
-    /* 首頁：群組選擇牆 (修正 iPad mini 按鈕置中) */
+    /* 首頁：群組選擇牆 (iOS 9 置中按鈕) */
     .groups-grid { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; margin: -0.5rem; }
     .group-card {
       background: #0f172a; border: 2px solid #334155; border-radius: 1.1rem;
@@ -109,7 +111,6 @@
       text-align: center; line-height: 68px; font-size: 2rem; margin-bottom: 0.6rem; display: block;
     }
     .group-name { font-size: 1.1rem; font-weight: 700; text-align: center; word-break: break-word; width: 100%; }
-    /* 100% 置中圓形按鈕 (兼容 iOS 9) */
     .btn-edit-group-card, .btn-del-group {
       position: absolute; top: 0.5rem; width: 28px; height: 28px; border-radius: 50%;
       padding: 0; margin: 0; line-height: 26px; text-align: center; font-size: 0.85rem;
@@ -129,7 +130,7 @@
     .form-row button { padding: 0.55rem 0.95rem; background: #38bdf8; color: #0f172a; border: none; border-radius: 0.5rem; font-weight: bold; cursor: pointer; white-space: nowrap; }
     .status-msg { font-size: 0.85rem; color: #fbbf24; margin-top: 0.5rem; }
 
-    /* 群組內部導覽與雙欄佈局 (修復巴士出界問題) */
+    /* 群組內部導覽與可調式佈局 */
     #group-view { display: none; }
     .group-nav-bar {
       display: -webkit-box; display: -webkit-flex; display: flex;
@@ -138,26 +139,36 @@
       background: #1e293b; padding: 0.8rem 1.2rem; border-radius: 1rem; border: 1px solid #334155;
       margin-bottom: 1.2rem; -webkit-flex-wrap: wrap; flex-wrap: wrap;
     }
-    .current-group-badge { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+    .current-group-badge { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; margin-bottom: 0.2rem; }
     .current-group-badge img, .current-group-badge .emoji-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; background: #0f172a; text-align: center; line-height: 36px; font-size: 1.2rem; margin-right: 0.65rem; display: block; }
     .current-group-title { font-size: 1.2rem; font-weight: 800; color: #38bdf8; }
+    .nav-actions { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
 
+    /* 主內容區：支援上下堆疊 (stacked) 與左右並排 (side) */
     .main-grid {
       display: -webkit-box; display: -webkit-flex; display: flex;
       -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start;
       width: 100%;
     }
-    .main-grid > .col-bus { width: 58%; margin-right: 2%; min-width: 0; }
-    .main-grid > .col-rem { width: 40%; min-width: 0; }
+    .main-grid.layout-stacked {
+      -webkit-box-orient: vertical; -webkit-box-direction: normal; -webkit-flex-direction: column; flex-direction: column;
+    }
+    .main-grid.layout-stacked > .card { width: 100%; margin-right: 0; margin-bottom: 1.2rem; }
+    .main-grid.layout-stacked > .card:last-child { margin-bottom: 0; }
+
+    .main-grid.layout-side > .card { width: 49%; margin-right: 2%; margin-bottom: 0; }
+    .main-grid.layout-side > .card:last-child { margin-right: 0; }
+
     @media (max-width: 768px) {
-      .main-grid { -webkit-box-orient: vertical; -webkit-box-direction: normal; -webkit-flex-direction: column; flex-direction: column; }
-      .main-grid > .col-bus, .main-grid > .col-rem { width: 100%; margin-right: 0; margin-bottom: 1.2rem; }
+      .main-grid.layout-side { -webkit-box-orient: vertical; -webkit-box-direction: normal; -webkit-flex-direction: column; flex-direction: column; }
+      .main-grid.layout-side > .card { width: 100%; margin-right: 0; margin-bottom: 1.2rem; }
+      .main-grid.layout-side > .card:last-child { margin-bottom: 0; }
       .time-box h1 { font-size: 2.3rem; }
       .weather-temp { font-size: 2.1rem; }
       .weather-box { text-align: left; margin-top: 0.5rem; width: 100%; }
     }
 
-    /* 巴士列表 (鎖定闊度防爆框) */
+    /* 巴士列表 */
     .bus-group { margin-bottom: 0.85rem; background: #0f172a; padding: 0.85rem 1rem; border-radius: 0.8rem; width: 100%; overflow: hidden; }
     .bus-group:last-child { margin-bottom: 0; }
     .bus-header {
@@ -276,8 +287,10 @@
           <div class="current-group-title" id="active-group-name">--</div>
         </div>
       </div>
-      <div>
-        <button class="btn-small primary" onclick="toggleInGroupEditPanel()" style="margin-right:0.4rem;">✎ 編輯群組</button>
+      <div class="nav-actions">
+        <button class="btn-small accent" onclick="swapCardOrder()" id="btn-swap-order">🔄 備忘置頂</button>
+        <button class="btn-small accent" onclick="toggleLayoutMode()" id="btn-layout-mode">↕️ 上下排列</button>
+        <button class="btn-small primary" onclick="toggleInGroupEditPanel()">✎ 編輯群組</button>
         <button class="btn-small" onclick="backToHomeGroups()">⬅ 切換群組</button>
       </div>
     </div>
@@ -299,13 +312,15 @@
       </div>
     </div>
 
-    <div class="main-grid">
-      <!-- 左欄：巴士 -->
-      <div class="card col-bus">
+    <!-- 主內容區 (可自由上下對調或並排) -->
+    <div class="main-grid layout-stacked" id="main-grid">
+      <!-- 區塊 1：巴士預計到站 -->
+      <div class="card" id="card-bus">
         <h2>
           <span>🚌 巴士預計到站</span>
           <div class="header-actions">
             <span class="last-update" id="eta-updated">更新中...</span>
+            <button class="btn-small" onclick="swapCardOrder()" title="將此區塊移至上方/下方">⇅ 移位</button>
             <button class="btn-small primary" onclick="toggleAddBusPanel()">＋ 新增路線</button>
           </div>
         </h2>
@@ -328,11 +343,14 @@
         <div id="bus-container">載入中...</div>
       </div>
 
-      <!-- 右欄：備忘錄 -->
-      <div class="card col-rem">
+      <!-- 區塊 2：群組專屬備忘 -->
+      <div class="card" id="card-rem">
         <h2>
           <span>📝 群組專屬備忘 <small style="font-size:0.72rem; color:#94a3b8; font-weight:normal;">(撳 📌 全屋廣播)</small></span>
-          <span class="last-update" id="db-status">🟢 已同步</span>
+          <div class="header-actions">
+            <span class="last-update" id="db-status">🟢 已同步</span>
+            <button class="btn-small" onclick="swapCardOrder()" title="將此區塊移至上方/下方">⇅ 移位</button>
+          </div>
         </h2>
         <div class="reminder-input">
           <input type="text" id="rem-input" placeholder="新增備忘 (如: 今晚唔返食飯)..." onkeypress="handleEnter(event)">
@@ -355,6 +373,54 @@
   </div>
 
   <script>
+    /* 0. 區塊次序與排版控制 (自動儲存於本機) */
+    var cardOrder = 'bus-first'; // 'bus-first' 或 'rem-first'
+    var layoutMode = 'stacked';  // 'stacked' (上下) 或 'side' (左右)
+    try {
+      cardOrder = localStorage.getItem('dashboard_card_order') || 'bus-first';
+      layoutMode = localStorage.getItem('dashboard_layout_mode') || 'stacked';
+    } catch (e) {}
+
+    function applyLayoutPreferences() {
+      var grid = document.getElementById('main-grid');
+      var busCard = document.getElementById('card-bus');
+      var remCard = document.getElementById('card-rem');
+      var swapBtn = document.getElementById('btn-swap-order');
+      var modeBtn = document.getElementById('btn-layout-mode');
+
+      // 調整 DOM 先後次序 (100% 兼容 iOS 9 舊版 Safari)
+      if (cardOrder === 'rem-first') {
+        grid.insertBefore(remCard, busCard);
+        swapBtn.innerText = '🔄 巴士置頂';
+      } else {
+        grid.insertBefore(busCard, remCard);
+        swapBtn.innerText = '🔄 備忘置頂';
+      }
+
+      // 調整上下排列或左右並排
+      if (layoutMode === 'side') {
+        grid.className = 'main-grid layout-side';
+        modeBtn.innerText = '↔️ 左右並排';
+      } else {
+        grid.className = 'main-grid layout-stacked';
+        modeBtn.innerText = '↕️ 上下排列';
+      }
+    }
+
+    function swapCardOrder() {
+      cardOrder = (cardOrder === 'bus-first') ? 'rem-first' : 'bus-first';
+      try { localStorage.setItem('dashboard_card_order', cardOrder); } catch (e) {}
+      applyLayoutPreferences();
+    }
+
+    function toggleLayoutMode() {
+      layoutMode = (layoutMode === 'stacked') ? 'side' : 'stacked';
+      try { localStorage.setItem('dashboard_layout_mode', layoutMode); } catch (e) {}
+      applyLayoutPreferences();
+    }
+
+    applyLayoutPreferences();
+
     /* 1. Firebase 初始化與全域狀態 */
     firebase.initializeApp({
       apiKey: "AIzaSyBUHonT_ucWcc3Ks4vprZTZV3ji80CVwD4",
