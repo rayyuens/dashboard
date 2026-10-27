@@ -7,817 +7,212 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Home Dashboard</title>
 
-  <!-- iOS 9 必備 Polyfill：補足舊版 Safari 缺少的 Promise 與 Fetch API -->
   <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.min.js"></script>
-
-  <!-- PWA Manifest & Service Worker 註冊 -->
   <link rel="manifest" href="manifest.json">
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('sw.js')
-          .then(function(reg) { console.log('Service Worker 註冊成功:', reg.scope); })
-          .catch(function(err) { console.log('Service Worker 註冊失敗:', err); });
+        navigator.serviceWorker.register('sw.js').catch(function() {});
       });
     }
   </script>
-
-  <!-- 引入 Firebase App & Realtime Database SDK (使用 8.10.1 確保 iOS 9 ES5 相容，語法與 9.x compat 完全一致) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent: #38bdf8;
-      --badge-red: #ef4444;
-      --badge-green: #22c55e;
-      --badge-yellow: #eab308;
-    }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body {
-      background-color: #0f172a;
-      background-color: var(--bg);
-      color: #f8fafc;
-      color: var(--text);
-      min-height: 100vh;
-      padding: 1.2rem 1.5rem;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-      gap: 1.2rem;
-      -webkit-transition: -webkit-transform 1.5s ease;
-      transition: transform 1.5s ease;
-      overflow-x: hidden;
+      background-color: #0f172a; color: #f8fafc; min-height: 100vh;
+      padding: 1.2rem; overflow-x: hidden;
+      -webkit-transition: -webkit-transform 1.5s ease; transition: transform 1.5s ease;
     }
-    body > * + * {
-      margin-top: 1.2rem;
-    }
-    @supports (gap: 1.2rem) {
-      body > * + * { margin-top: 0; }
-    }
+    body > div { margin-bottom: 1.2rem; }
+    body > div:last-of-type { margin-bottom: 0; }
 
-    /* ================= 夜間防烙印與自動調暗遮罩 ================= */
+    /* 夜間遮罩 */
     #night-overlay {
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.82);
-      z-index: 9999;
-      pointer-events: none;
-      opacity: 0;
-      -webkit-transition: opacity 1.2s ease;
-      transition: opacity 1.2s ease;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: end;
-      -webkit-align-items: flex-end;
-      align-items: flex-end;
-      -webkit-box-pack: center;
-      -webkit-justify-content: center;
-      justify-content: center;
-      padding-bottom: 1.2rem;
-      margin-top: 0 !important;
+      position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+      background: rgba(0,0,0,0.82); z-index: 9999; pointer-events: none;
+      opacity: 0; -webkit-transition: opacity 1.2s ease; transition: opacity 1.2s ease;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-align: end; -webkit-align-items: flex-end; align-items: flex-end;
+      -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+      padding-bottom: 1.2rem; margin-bottom: 0;
     }
-    body.night-dimmed #night-overlay {
-      opacity: 1;
-    }
-    .night-hint {
-      color: rgba(255, 255, 255, 0.35);
-      font-size: 0.82rem;
-      letter-spacing: 0.5px;
-    }
+    body.night-dimmed #night-overlay { opacity: 1; }
+    .night-hint { color: rgba(255,255,255,0.35); font-size: 0.82rem; }
 
-    /* 頂部欄：時鐘與即時天氣 */
+    /* 頂部欄 */
     .top-bar {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-pack: justify;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      background: #1e293b;
-      background: var(--card-bg);
-      padding: 1.2rem 1.8rem;
-      border-radius: 1.2rem;
-      -webkit-flex-wrap: wrap;
-      flex-wrap: wrap;
-      gap: 1rem;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+      -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+      background: #1e293b; padding: 1.2rem 1.5rem; border-radius: 1.2rem;
+      -webkit-flex-wrap: wrap; flex-wrap: wrap;
     }
-    .time-box h1 { font-size: 3.2rem; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
-    .time-subrow { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; gap: 0.75rem; margin-top: 0.25rem; -webkit-flex-wrap: wrap; flex-wrap: wrap; }
-    .time-subrow p { font-size: 1.15rem; color: #94a3b8; color: var(--text-muted); margin-right: 0.5rem; }
-    .btn-night-toggle {
-      background: #0f172a;
-      color: #94a3b8;
-      color: var(--text-muted);
-      border: 1px solid #334155;
-      padding: 0.2rem 0.6rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      cursor: pointer;
-    }
-    .btn-night-toggle.active {
-      color: #facc15;
-      border-color: #eab308;
-    }
-    
-    .weather-box { text-align: right; display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-orient: vertical; -webkit-box-direction: normal; -webkit-flex-direction: column; flex-direction: column; -webkit-box-align: end; -webkit-align-items: flex-end; align-items: flex-end; gap: 0.35rem; }
-    .weather-temp-row { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; gap: 0.6rem; }
-    .weather-temp { font-size: 2.8rem; font-weight: 700; color: #38bdf8; color: var(--accent); line-height: 1; }
-    .weather-info { font-size: 0.95rem; color: #94a3b8; color: var(--text-muted); margin: 0.2rem 0; }
+    .time-box h1 { font-size: 3rem; font-weight: 800; letter-spacing: -1px; }
+    .time-subrow { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; margin-top: 0.25rem; -webkit-flex-wrap: wrap; flex-wrap: wrap; }
+    .time-subrow p { font-size: 1.1rem; color: #94a3b8; margin-right: 0.6rem; }
+    .btn-night-toggle { background: #0f172a; color: #94a3b8; border: 1px solid #334155; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; cursor: pointer; }
+    .btn-night-toggle.active { color: #facc15; border-color: #eab308; }
 
-    .rain-tip {
-      display: inline-block;
-      padding: 0.3rem 0.75rem;
-      border-radius: 999px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      background: #334155;
-      color: #f8fafc;
-      color: var(--text);
-    }
-    .rain-tip.safe { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
-    .rain-tip.warn { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
-    .rain-tip.danger { background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); }
+    .weather-box { text-align: right; }
+    .weather-temp { font-size: 2.6rem; font-weight: 700; color: #38bdf8; line-height: 1; }
+    .weather-info { font-size: 0.92rem; color: #94a3b8; margin: 0.3rem 0; }
+    .rain-tip { display: inline-block; padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.82rem; font-weight: 600; background: #334155; color: #f8fafc; }
+    .rain-tip.safe { background: rgba(34,197,94,0.2); color: #4ade80; border: 1px solid rgba(34,197,94,0.4); }
+    .rain-tip.danger { background: rgba(239,68,68,0.25); color: #f87171; border: 1px solid rgba(239,68,68,0.5); }
 
-    /* ================= 全域共用家庭廣播橫幅 (全站常駐) ================= */
+    /* 全屋重要廣播 */
     .pinned-banner {
-      display: none;
-      background: -webkit-linear-gradient(left, rgba(234, 179, 8, 0.22), rgba(245, 158, 11, 0.12));
-      background: linear-gradient(90deg, rgba(234, 179, 8, 0.22), rgba(245, 158, 11, 0.12));
-      border: 2px solid #eab308;
-      border-radius: 1rem;
-      padding: 0.9rem 1.3rem;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      -webkit-box-pack: justify;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      gap: 1rem;
-      box-shadow: 0 0 20px rgba(234, 179, 8, 0.15);
-      -webkit-animation: bannerPulse 3s infinite ease-in-out;
-      animation: bannerPulse 3s infinite ease-in-out;
+      display: none; background: rgba(234,179,8,0.18); border: 2px solid #eab308;
+      border-radius: 1rem; padding: 0.85rem 1.2rem;
+      -webkit-animation: bannerPulse 3s infinite ease-in-out; animation: bannerPulse 3s infinite ease-in-out;
     }
-    .pinned-banner.active { display: -webkit-box; display: -webkit-flex; display: flex; }
-    @-webkit-keyframes bannerPulse {
-      0%, 100% { border-color: #eab308; }
-      50% { border-color: #fde047; }
-    }
-    @keyframes bannerPulse {
-      0%, 100% { border-color: #eab308; }
-      50% { border-color: #fde047; }
-    }
-    .pinned-content {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      gap: 0.8rem;
-      -webkit-box-flex: 1;
-      -webkit-flex: 1;
-      flex: 1;
-      -webkit-flex-wrap: wrap;
-      flex-wrap: wrap;
-    }
-    .pinned-tag {
-      background: #eab308;
-      color: #0f172a;
-      font-weight: 800;
-      font-size: 0.85rem;
-      padding: 0.25rem 0.65rem;
-      border-radius: 0.5rem;
-      white-space: nowrap;
-      margin-right: 0.5rem;
-    }
-    .pinned-text-list {
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: #fef08a;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-      gap: 0.25rem;
-      -webkit-box-flex: 1;
-      -webkit-flex: 1;
-      flex: 1;
-    }
-    .pinned-unpin-btn {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(250, 204, 21, 0.5);
-      color: #fde047;
-      padding: 0.3rem 0.65rem;
-      border-radius: 0.45rem;
-      font-size: 0.8rem;
-      cursor: pointer;
-      white-space: nowrap;
-    }
+    .pinned-banner.active { display: block; }
+    @-webkit-keyframes bannerPulse { 0%, 100% { border-color: #eab308; } 50% { border-color: #fde047; } }
+    @keyframes bannerPulse { 0%, 100% { border-color: #eab308; } 50% { border-color: #fde047; } }
+    .pinned-content { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-flex-wrap: wrap; flex-wrap: wrap; }
+    .pinned-tag { background: #eab308; color: #0f172a; font-weight: 800; font-size: 0.85rem; padding: 0.25rem 0.6rem; border-radius: 0.45rem; margin-right: 0.8rem; white-space: nowrap; }
+    .pinned-text-list { font-size: 1.1rem; font-weight: 700; color: #fef08a; -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 200px; }
+    .pinned-row { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between; -webkit-box-align: center; -webkit-align-items: center; align-items: center; margin: 0.2rem 0; }
+    .pinned-unpin-btn { background: rgba(15,23,42,0.7); border: 1px solid #facc15; color: #fde047; padding: 0.25rem 0.6rem; border-radius: 0.4rem; font-size: 0.78rem; cursor: pointer; margin-left: 0.6rem; white-space: nowrap; }
 
-    /* ================= 首頁：家庭群組選擇牆 ================= */
-    #home-view {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-      gap: 1.2rem;
-      -webkit-box-flex: 1;
-      -webkit-flex: 1;
-      flex: 1;
+    /* 通用卡片與按鈕 */
+    .card { background: #1e293b; border-radius: 1.2rem; padding: 1.2rem 1.4rem; width: 100%; min-width: 0; overflow: hidden; }
+    .card h2 {
+      font-size: 1.2rem; margin-bottom: 0.9rem; border-bottom: 1px solid #334155; padding-bottom: 0.55rem;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+      -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-flex-wrap: wrap; flex-wrap: wrap;
     }
-    .groups-grid {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-flex-wrap: wrap;
-      flex-wrap: wrap;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-      gap: 1.2rem;
-      margin-top: 0.5rem;
-    }
+    .header-actions { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+    .last-update { font-size: 0.78rem; color: #94a3b8; font-weight: normal; margin-right: 0.6rem; }
+    .btn-small { background: #334155; color: #f8fafc; border: none; padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-size: 0.82rem; cursor: pointer; font-weight: 600; }
+    .btn-small.primary { background: #38bdf8; color: #0f172a; }
+    .btn-small.danger { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); }
+
+    /* 首頁：群組選擇牆 (修正 iPad mini 按鈕置中) */
+    .groups-grid { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; margin: -0.5rem; }
     .group-card {
-      background: #0f172a;
-      border: 2px solid #334155;
-      border-radius: 1.2rem;
-      padding: 1.4rem 1rem;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      gap: 0.8rem;
-      cursor: pointer;
-      position: relative;
-      min-width: 165px;
-      margin: 0.3rem;
-      -webkit-transition: -webkit-transform 0.15s ease, border-color 0.15s ease;
-      transition: transform 0.15s ease, border-color 0.15s ease;
-    }
-    @supports (display: grid) {
-      .group-card { margin: 0; }
-    }
-    .group-card:hover {
-      -webkit-transform: translateY(-3px);
-      transform: translateY(-3px);
-      border-color: #38bdf8;
-      border-color: var(--accent);
+      background: #0f172a; border: 2px solid #334155; border-radius: 1.1rem;
+      padding: 1.4rem 1rem; width: 165px; margin: 0.5rem;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-orient: vertical; -webkit-box-direction: normal; -webkit-flex-direction: column; flex-direction: column;
+      -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+      cursor: pointer; position: relative;
     }
     .group-avatar {
-      width: 76px;
-      height: 76px;
-      border-radius: 50%;
-      object-fit: cover;
-      background: #1e293b;
-      border: 2px solid #38bdf8;
-      border: 2px solid var(--accent);
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      -webkit-box-pack: center;
-      -webkit-justify-content: center;
-      justify-content: center;
-      font-size: 2.2rem;
-      margin-bottom: 0.4rem;
+      width: 72px; height: 72px; border-radius: 50%; object-fit: cover;
+      background: #1e293b; border: 2px solid #38bdf8;
+      text-align: center; line-height: 68px; font-size: 2rem; margin-bottom: 0.6rem; display: block;
     }
-    .group-name {
-      font-size: 1.15rem;
-      font-weight: 700;
-      text-align: center;
-      word-break: break-word;
+    .group-name { font-size: 1.1rem; font-weight: 700; text-align: center; word-break: break-word; width: 100%; }
+    /* 100% 置中圓形按鈕 (兼容 iOS 9) */
+    .btn-edit-group-card, .btn-del-group {
+      position: absolute; top: 0.5rem; width: 28px; height: 28px; border-radius: 50%;
+      padding: 0; margin: 0; line-height: 26px; text-align: center; font-size: 0.85rem;
+      cursor: pointer; display: block; -webkit-appearance: none;
     }
-    .btn-del-group {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: #ef4444;
-      color: var(--badge-red);
-      border-radius: 50%;
-      width: 28px;
-      height: 28px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      -webkit-box-pack: center;
-      -webkit-justify-content: center;
-      justify-content: center;
-    }
-    .btn-edit-group-card {
-      position: absolute;
-      top: 0.5rem;
-      left: 0.5rem;
-      background: rgba(56, 189, 248, 0.15);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      color: #38bdf8;
-      color: var(--accent);
-      border-radius: 50%;
-      width: 28px;
-      height: 28px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      -webkit-box-pack: center;
-      -webkit-justify-content: center;
-      justify-content: center;
-    }
+    .btn-edit-group-card { left: 0.5rem; background: rgba(56,189,248,0.18); border: 1px solid rgba(56,189,248,0.5); color: #38bdf8; }
+    .btn-del-group { right: 0.5rem; background: rgba(239,68,68,0.18); border: 1px solid rgba(239,68,68,0.5); color: #ef4444; }
 
-    /* 新增/編輯群組面板 */
-    .add-group-panel {
-      display: none;
-      background: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 0.9rem;
-      padding: 1.1rem;
-      margin-bottom: 0.5rem;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-      gap: 0.9rem;
-    }
-    .add-group-panel.active { display: -webkit-box; display: -webkit-flex; display: flex; }
-    .avatar-upload-row {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      gap: 1rem;
-      -webkit-flex-wrap: wrap;
-      flex-wrap: wrap;
-      margin: 0.5rem 0;
-    }
-    .avatar-preview {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      object-fit: cover;
-      background: #1e293b;
-      border: 2px dashed #38bdf8;
-      border: 2px dashed var(--accent);
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      -webkit-box-pack: center;
-      -webkit-justify-content: center;
-      justify-content: center;
-      font-size: 1.6rem;
-      margin-right: 0.6rem;
-    }
-    .file-label {
-      background: #334155;
-      color: #f8fafc;
-      color: var(--text);
-      padding: 0.5rem 0.9rem;
-      border-radius: 0.5rem;
-      font-size: 0.9rem;
-      cursor: pointer;
-      font-weight: 600;
-      margin-right: 0.5rem;
-    }
+    /* 表單面板 */
+    .add-group-panel, .add-bus-panel { display: none; background: #0f172a; border: 1px solid #334155; border-radius: 0.8rem; padding: 1rem; margin-bottom: 1rem; }
+    .add-group-panel.active, .add-bus-panel.active { display: block; }
+    .avatar-upload-row { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-flex-wrap: wrap; flex-wrap: wrap; margin: 0.6rem 0; }
+    .avatar-preview { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #1e293b; border: 2px dashed #38bdf8; text-align: center; line-height: 48px; font-size: 1.5rem; margin-right: 0.8rem; display: block; }
+    .file-label { background: #334155; color: #f8fafc; padding: 0.45rem 0.85rem; border-radius: 0.5rem; font-size: 0.85rem; cursor: pointer; font-weight: 600; margin-right: 0.5rem; }
+    .form-row { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-flex-wrap: wrap; flex-wrap: wrap; margin-top: 0.5rem; }
+    .form-row input, .form-row select { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 160px; padding: 0.55rem 0.75rem; border-radius: 0.5rem; border: 1px solid #334155; background: #1e293b; color: white; font-size: 0.92rem; margin-right: 0.5rem; }
+    .form-row button { padding: 0.55rem 0.95rem; background: #38bdf8; color: #0f172a; border: none; border-radius: 0.5rem; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    .status-msg { font-size: 0.85rem; color: #fbbf24; margin-top: 0.5rem; }
 
-    /* ================= 群組內部：專屬儀表板導覽列 ================= */
-    #group-view {
-      display: none;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-      gap: 1.2rem;
-      -webkit-box-flex: 1;
-      -webkit-flex: 1;
-      flex: 1;
-    }
-    #group-view > * + * {
-      margin-top: 1.2rem;
-    }
-    @supports (gap: 1.2rem) {
-      #group-view > * + * { margin-top: 0; }
-    }
+    /* 群組內部導覽與雙欄佈局 (修復巴士出界問題) */
+    #group-view { display: none; }
     .group-nav-bar {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-pack: justify;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      background: #1e293b;
-      padding: 0.8rem 1.3rem;
-      border-radius: 1rem;
-      border: 1px solid #334155;
-      -webkit-flex-wrap: wrap;
-      flex-wrap: wrap;
-      gap: 0.8rem;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+      -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+      background: #1e293b; padding: 0.8rem 1.2rem; border-radius: 1rem; border: 1px solid #334155;
+      margin-bottom: 1.2rem; -webkit-flex-wrap: wrap; flex-wrap: wrap;
     }
-    .current-group-badge {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .current-group-badge img, .current-group-badge .emoji-avatar {
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid #38bdf8;
-      border: 2px solid var(--accent);
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      -webkit-box-pack: center;
-      -webkit-justify-content: center;
-      justify-content: center;
-      background: #0f172a;
-      font-size: 1.3rem;
-      margin-right: 0.6rem;
-    }
-    .current-group-title {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: #38bdf8;
-      color: var(--accent);
-    }
-    .nav-btn-group {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      gap: 0.6rem;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-    }
-    .nav-btn-group > button + button {
-      margin-left: 0.5rem;
-    }
+    .current-group-badge { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+    .current-group-badge img, .current-group-badge .emoji-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; background: #0f172a; text-align: center; line-height: 36px; font-size: 1.2rem; margin-right: 0.65rem; display: block; }
+    .current-group-title { font-size: 1.2rem; font-weight: 800; color: #38bdf8; }
 
-    /* 中間主區域：巴士 + 備忘 */
     .main-grid {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 1.2rem;
-      -webkit-box-flex: 1;
-      -webkit-flex: 1;
-      flex: 1;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start;
+      width: 100%;
     }
-    .main-grid > .card:first-child { -webkit-box-flex: 1.4; -webkit-flex: 1.4; flex: 1.4; margin-right: 0.6rem; }
-    .main-grid > .card:last-child { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; margin-left: 0.6rem; }
-    @supports (display: grid) {
-      .main-grid > .card:first-child, .main-grid > .card:last-child { margin: 0; }
-    }
+    .main-grid > .col-bus { width: 58%; margin-right: 2%; min-width: 0; }
+    .main-grid > .col-rem { width: 40%; min-width: 0; }
     @media (max-width: 768px) {
-      .main-grid {
-        -webkit-box-orient: vertical;
-        -webkit-box-direction: normal;
-        -webkit-flex-direction: column;
-        flex-direction: column;
-        grid-template-columns: 1fr;
-      }
-      .main-grid > .card:first-child, .main-grid > .card:last-child { margin: 0 0 1rem 0; }
-      .time-box h1 { font-size: 2.4rem; }
-      .weather-temp { font-size: 2.2rem; }
-      .weather-box { -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start; text-align: left; }
+      .main-grid { -webkit-box-orient: vertical; -webkit-box-direction: normal; -webkit-flex-direction: column; flex-direction: column; }
+      .main-grid > .col-bus, .main-grid > .col-rem { width: 100%; margin-right: 0; margin-bottom: 1.2rem; }
+      .time-box h1 { font-size: 2.3rem; }
+      .weather-temp { font-size: 2.1rem; }
+      .weather-box { text-align: left; margin-top: 0.5rem; width: 100%; }
     }
 
-    .card {
-      background: #1e293b;
-      background: var(--card-bg);
-      border-radius: 1.2rem;
-      padding: 1.3rem 1.5rem;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-    }
-    .card h2 {
-      font-size: 1.25rem;
-      margin-bottom: 0.9rem;
-      border-bottom: 1px solid #334155;
-      padding-bottom: 0.55rem;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-pack: justify;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      -webkit-flex-wrap: wrap;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    .header-actions { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; gap: 0.6rem; }
-    .last-update { font-size: 0.8rem; color: #94a3b8; color: var(--text-muted); font-weight: normal; margin-right: 0.5rem; }
-    .btn-small {
-      background: #334155;
-      color: #f8fafc;
-      color: var(--text);
-      border: none;
-      padding: 0.4rem 0.8rem;
-      border-radius: 0.5rem;
-      font-size: 0.85rem;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .btn-small.primary { background: #38bdf8; background: var(--accent); color: #0f172a; }
-    .btn-small.danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
-
-    /* 新增巴士路線面板 */
-    .add-bus-panel {
-      display: none;
-      background: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 0.8rem;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-      gap: 0.8rem;
-    }
-    .add-bus-panel.active { display: -webkit-box; display: -webkit-flex; display: flex; }
-    .form-row { display: -webkit-box; display: -webkit-flex; display: flex; gap: 0.5rem; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-flex-wrap: wrap; flex-wrap: wrap; margin-bottom: 0.4rem; }
-    .form-row input, .form-row select {
-      -webkit-box-flex: 1;
-      -webkit-flex: 1;
-      flex: 1;
-      min-width: 180px;
-      padding: 0.6rem 0.8rem;
-      border-radius: 0.5rem;
-      border: 1px solid #334155;
-      background: #1e293b;
-      background: var(--card-bg);
-      color: white;
-      font-size: 0.95rem;
-      margin-right: 0.4rem;
-    }
-    .form-row button {
-      padding: 0.6rem 1rem;
-      background: #38bdf8;
-      background: var(--accent);
-      color: #0f172a;
-      border: none;
-      border-radius: 0.5rem;
-      font-weight: bold;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .status-msg { font-size: 0.85rem; color: #fbbf24; }
-
-    /* 巴士列表 */
-    .bus-group {
-      margin-bottom: 1rem;
-      background: #0f172a;
-      padding: 0.9rem 1rem;
-      border-radius: 0.8rem;
-    }
+    /* 巴士列表 (鎖定闊度防爆框) */
+    .bus-group { margin-bottom: 0.85rem; background: #0f172a; padding: 0.85rem 1rem; border-radius: 0.8rem; width: 100%; overflow: hidden; }
     .bus-group:last-child { margin-bottom: 0; }
     .bus-header {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-pack: justify;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      margin-bottom: 0.4rem;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+      -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start;
+      margin-bottom: 0.45rem; width: 100%;
     }
-    .bus-title { font-size: 1.2rem; font-weight: bold; color: #fbbf24; }
-    .bus-subtitle { font-size: 0.88rem; color: #94a3b8; color: var(--text-muted); font-weight: normal; margin-left: 0.4rem; }
-    .btn-del-bus {
-      background: transparent;
-      border: 1px solid #ef4444;
-      border: 1px solid var(--badge-red);
-      color: #ef4444;
-      color: var(--badge-red);
-      border-radius: 0.4rem;
-      padding: 0.15rem 0.5rem;
-      font-size: 0.78rem;
-      cursor: pointer;
-    }
+    .bus-title { font-size: 1.15rem; font-weight: bold; color: #fbbf24; -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; padding-right: 0.5rem; word-break: break-word; }
+    .bus-subtitle { font-size: 0.85rem; color: #94a3b8; font-weight: normal; margin-left: 0.35rem; }
+    .btn-del-bus { background: transparent; border: 1px solid #ef4444; color: #ef4444; border-radius: 0.4rem; padding: 0.15rem 0.5rem; font-size: 0.75rem; cursor: pointer; white-space: nowrap; -webkit-flex-shrink: 0; flex-shrink: 0; }
     .eta-row {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-pack: justify;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      padding: 0.5rem 0;
-      border-bottom: 1px dashed #334155;
-      font-variant-numeric: tabular-nums;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+      -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+      padding: 0.45rem 0; border-bottom: 1px dashed #334155; width: 100%;
     }
     .eta-row:last-child { border-bottom: none; padding-bottom: 0; }
-    .eta-seq { color: #94a3b8; color: var(--text-muted); font-size: 0.92rem; }
-    .eta-countdown {
-      background: #334155;
-      padding: 0.22rem 0.65rem;
-      border-radius: 999px;
-      font-size: 0.88rem;
-    }
-    .eta-urgent { background: #22c55e; background: var(--badge-green); color: black; font-weight: bold; }
+    .eta-seq { color: #94a3b8; font-size: 0.9rem; -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; padding-right: 0.5rem; }
+    .eta-countdown { background: #334155; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.85rem; white-space: nowrap; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .eta-urgent { background: #22c55e; color: black; font-weight: bold; }
 
-    /* 備忘錄與釘選按鈕 */
-    .reminder-input { display: -webkit-box; display: -webkit-flex; display: flex; gap: 0.5rem; margin-bottom: 0.9rem; }
-    .reminder-input input {
-      -webkit-box-flex: 1;
-      -webkit-flex: 1;
-      flex: 1;
-      padding: 0.6rem 0.8rem;
-      border-radius: 0.5rem;
-      border: 1px solid #334155;
-      background: #0f172a;
-      color: white;
-      font-size: 0.95rem;
-      margin-right: 0.4rem;
-    }
-    .reminder-input button {
-      padding: 0.6rem 1rem;
-      background: #38bdf8;
-      background: var(--accent);
-      border: none;
-      border-radius: 0.5rem;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .reminder-list { list-style: none; display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-orient: vertical; -webkit-box-direction: normal; -webkit-flex-direction: column; flex-direction: column; gap: 0.5rem; }
+    /* 備忘錄 */
+    .reminder-input { display: -webkit-box; display: -webkit-flex; display: flex; margin-bottom: 0.85rem; width: 100%; }
+    .reminder-input input { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; padding: 0.55rem 0.75rem; border-radius: 0.5rem; border: 1px solid #334155; background: #0f172a; color: white; font-size: 0.92rem; margin-right: 0.4rem; }
+    .reminder-input button { padding: 0.55rem 0.9rem; background: #38bdf8; color: #0f172a; border: none; border-radius: 0.5rem; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    .reminder-list { list-style: none; }
     .reminder-item {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-pack: justify;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      background: #0f172a;
-      padding: 0.65rem 0.85rem;
-      border-radius: 0.5rem;
-      border: 1px solid transparent;
-      gap: 0.5rem;
-      margin-bottom: 0.4rem;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+      -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+      background: #0f172a; padding: 0.6rem 0.8rem; border-radius: 0.5rem; margin-bottom: 0.45rem; width: 100%;
     }
-    .reminder-item.pinned {
-      border-color: rgba(234, 179, 8, 0.6);
-      background: rgba(234, 179, 8, 0.08);
-    }
-    .rem-actions {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      gap: 0.35rem;
-    }
-    .btn-pin {
-      background: transparent;
-      border: 1px solid #334155;
-      color: #94a3b8;
-      color: var(--text-muted);
-      border-radius: 0.4rem;
-      padding: 0.15rem 0.45rem;
-      font-size: 0.85rem;
-      cursor: pointer;
-      margin-right: 0.3rem;
-    }
-    .btn-pin.active {
-      background: rgba(234, 179, 8, 0.25);
-      border-color: #eab308;
-      color: #fde047;
-    }
-    .btn-del-rem {
-      background: transparent;
-      border: none;
-      color: #ef4444;
-      color: var(--badge-red);
-      font-size: 1.05rem;
-      cursor: pointer;
-      padding: 0 0.35rem;
-    }
+    .reminder-text { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; word-break: break-word; padding-right: 0.5rem; font-size: 0.95rem; }
+    .rem-actions { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .btn-pin { background: transparent; border: 1px solid #334155; color: #94a3b8; border-radius: 0.4rem; padding: 0.15rem 0.45rem; font-size: 0.8rem; cursor: pointer; margin-right: 0.3rem; white-space: nowrap; }
+    .btn-del-rem { background: transparent; border: none; color: #ef4444; font-size: 1rem; cursor: pointer; padding: 0 0.3rem; }
 
-    /* 底部：未來 5 天迷你天氣預報卡 */
-    .forecast-grid {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 0.8rem;
-    }
-    .forecast-day {
-      -webkit-box-flex: 1;
-      -webkit-flex: 1;
-      flex: 1;
-      background: #0f172a;
-      border-radius: 0.8rem;
-      padding: 0.8rem;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      flex-direction: column;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      text-align: center;
-      gap: 0.35rem;
-      margin-right: 0.5rem;
-    }
-    .forecast-day:last-child { margin-right: 0; }
-    @supports (display: grid) {
-      .forecast-day { margin-right: 0; }
-    }
-    @media (max-width: 640px) {
-      .forecast-grid { grid-template-columns: repeat(2, 1fr); -webkit-flex-wrap: wrap; flex-wrap: wrap; }
-    }
-    .f-week { font-weight: 700; font-size: 0.95rem; color: #f8fafc; color: var(--text); }
-    .f-date { font-size: 0.78rem; color: #94a3b8; color: var(--text-muted); }
-    .f-icon { width: 42px; height: 42px; margin: 0.15rem 0; background: rgba(255,255,255,0.1); border-radius: 8px; padding: 4px; }
-    .f-temp { font-weight: 700; font-size: 1rem; color: #38bdf8; color: var(--accent); }
-    .f-psr { font-size: 0.78rem; color: #94a3b8; color: var(--text-muted); }
+    /* 底部 5 天預報 */
+    .forecast-grid { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between; -webkit-flex-wrap: wrap; flex-wrap: wrap; }
+    .forecast-day { width: 19%; min-width: 110px; background: #0f172a; border-radius: 0.8rem; padding: 0.75rem 0.5rem; text-align: center; margin-bottom: 0.5rem; }
+    @media (max-width: 640px) { .forecast-day { width: 48%; } }
+    .f-week { font-weight: 700; font-size: 0.92rem; }
+    .f-date { font-size: 0.75rem; color: #94a3b8; margin: 0.15rem 0; }
+    .f-icon { width: 40px; height: 40px; margin: 0.2rem auto; background: rgba(255,255,255,0.1); border-radius: 8px; padding: 4px; display: block; }
+    .f-temp { font-weight: 700; font-size: 0.95rem; color: #38bdf8; }
+    .f-psr { font-size: 0.75rem; color: #94a3b8; margin-top: 0.15rem; }
   </style>
 </head>
 <body>
 
-  <!-- 夜間自動調暗遮罩 -->
   <div id="night-overlay">
     <div class="night-hint">🌙 夜間護眼與防烙印模式生效中（輕觸螢幕可暫時喚醒 60 秒）</div>
   </div>
 
-  <!-- 頂部：時鐘、日期、即時天氣與未來兩小時降雨提示 (全站常駐) -->
   <div class="top-bar">
     <div class="time-box">
       <h1 id="clock">--:--:--</h1>
@@ -827,15 +222,12 @@
       </div>
     </div>
     <div class="weather-box">
-      <div class="weather-temp-row">
-        <div class="weather-temp" id="temp">--°C</div>
-      </div>
+      <div class="weather-temp" id="temp">--°C</div>
       <div class="weather-info" id="weather-desc">載入天氣中...</div>
       <div class="rain-tip" id="rain-tip">🌂 正在分析降雨預報...</div>
     </div>
   </div>
 
-  <!-- 📢 全域共用家庭廣播橫幅 (全站常駐，無論身處首頁或任何群組都睇到) -->
   <div class="pinned-banner" id="global-pinned-banner">
     <div class="pinned-content">
       <span class="pinned-tag">📢 全屋重要廣播</span>
@@ -843,42 +235,39 @@
     </div>
   </div>
 
-  <!-- ================= 畫面 A：首頁 (選擇或管理家庭群組) ================= -->
+  <!-- 畫面 A：首頁群組選擇 -->
   <div id="home-view">
-    <div class="card" style="-webkit-box-flex:1; -webkit-flex:1; flex:1;">
+    <div class="card">
       <h2>
         <span>👨‍👩‍👧‍👦 選擇家庭群組 / 成員面板</span>
         <button class="btn-small primary" onclick="openCreateGroupPanel()">＋ 新增群組</button>
       </h2>
 
-      <!-- 新增 / 編輯家庭群組表單 -->
       <div class="add-group-panel" id="add-group-panel">
         <div style="font-weight:bold; color:#38bdf8;" id="group-form-title">建立新家庭群組</div>
         <div class="avatar-upload-row">
           <div id="group-avatar-preview" class="avatar-preview">🏠</div>
           <label class="file-label">
             📷 上傳 / 更換圖片
-            <input type="file" id="group-icon-input" accept="image/*" style="display:none;" onchange="handleGroupIconUpload(event, 'home')">
+            <input type="file" accept="image/*" style="display:none;" onchange="handleGroupIconUpload(event, 'home')">
           </label>
-          <button class="btn-small danger" onclick="clearUploadedIcon('home')">重置預設圖示 🏠</button>
+          <button class="btn-small danger" onclick="clearUploadedIcon('home')">重置預設 🏠</button>
         </div>
         <div class="form-row">
-          <input type="text" id="group-name-input" placeholder="輸入群組名稱 (例如: 屋企大廳、返工專區、爸媽專用)">
-          <button onclick="saveGroupFromHome()" id="group-form-submit-btn">確認建立</button>
+          <input type="text" id="group-name-input" placeholder="輸入群組名稱 (例如: 屋企大廳、返工專區)">
+          <button onclick="saveGroupFromHome()" id="group-form-submit-btn" style="margin-right:0.4rem;">確認建立</button>
           <button class="btn-small" onclick="closeGroupPanel()">取消</button>
         </div>
       </div>
 
-      <!-- 群組卡片列表 -->
       <div class="groups-grid" id="groups-grid">
-        <div style="color:#64748b;">正在同步雲端群組...</div>
+        <div style="color:#64748b; padding:0.5rem;">正在同步雲端群組...</div>
       </div>
     </div>
   </div>
 
-  <!-- ================= 畫面 B：群組內部 (獨立巴士路線 + 獨立備忘錄) ================= -->
+  <!-- 畫面 B：群組專屬面板 -->
   <div id="group-view">
-    <!-- 群組頂部切換列 -->
     <div class="group-nav-bar">
       <div class="current-group-badge">
         <div id="active-group-avatar" class="emoji-avatar">🏠</div>
@@ -887,34 +276,32 @@
           <div class="current-group-title" id="active-group-name">--</div>
         </div>
       </div>
-      <div class="nav-btn-group">
-        <button class="btn-small primary" onclick="toggleInGroupEditPanel()">✎ 編輯群組名稱 / 圖示</button>
-        <button class="btn-small" onclick="backToHomeGroups()">⬅ 切換家庭群組</button>
+      <div>
+        <button class="btn-small primary" onclick="toggleInGroupEditPanel()" style="margin-right:0.4rem;">✎ 編輯群組</button>
+        <button class="btn-small" onclick="backToHomeGroups()">⬅ 切換群組</button>
       </div>
     </div>
 
-    <!-- 群組內部直接修改名稱與圖示面板 -->
     <div class="add-group-panel" id="in-group-edit-panel">
       <div style="font-weight:bold; color:#38bdf8;">✎ 修改當前群組名稱與圖示</div>
       <div class="avatar-upload-row">
         <div id="in-group-avatar-preview" class="avatar-preview">🏠</div>
         <label class="file-label">
           📷 更換新圖片
-          <input type="file" id="in-group-icon-input" accept="image/*" style="display:none;" onchange="handleGroupIconUpload(event, 'ingroup')">
+          <input type="file" accept="image/*" style="display:none;" onchange="handleGroupIconUpload(event, 'ingroup')">
         </label>
-        <button class="btn-small danger" onclick="clearUploadedIcon('ingroup')">重置為預設 🏠</button>
+        <button class="btn-small danger" onclick="clearUploadedIcon('ingroup')">重置預設 🏠</button>
       </div>
       <div class="form-row">
         <input type="text" id="in-group-name-input" placeholder="輸入新群組名稱">
-        <button onclick="saveInGroupEdit()">儲存修改</button>
+        <button onclick="saveInGroupEdit()" style="margin-right:0.4rem;">儲存修改</button>
         <button class="btn-small" onclick="toggleInGroupEditPanel()">取消</button>
       </div>
     </div>
 
-    <!-- 中間：巴士到站 + 家居備忘 -->
     <div class="main-grid">
-      <!-- 巴士實時到站時間 -->
-      <div class="card">
+      <!-- 左欄：巴士 -->
+      <div class="card col-bus">
         <h2>
           <span>🚌 巴士預計到站</span>
           <div class="header-actions">
@@ -923,36 +310,32 @@
           </div>
         </h2>
 
-        <!-- 互動式新增巴士面板 -->
         <div class="add-bus-panel" id="add-bus-panel">
           <div class="form-row">
-            <input type="text" id="route-input" placeholder="輸入路線 (例如: 297, 93A, 98D)" style="text-transform:uppercase;">
+            <input type="text" id="route-input" placeholder="輸入路線 (如: 297, 93A)" style="text-transform:uppercase;">
             <button onclick="searchRouteDirections()">1. 搜尋方向</button>
           </div>
-
           <div class="form-row" id="dir-row" style="display:none;">
             <select id="dir-select" onchange="loadRouteStops()"></select>
           </div>
-
           <div class="form-row" id="stop-row" style="display:none;">
             <select id="stop-select"></select>
             <button onclick="confirmAddBus()">2. 確認加入</button>
           </div>
-
           <div class="status-msg" id="bus-search-msg"></div>
         </div>
 
         <div id="bus-container">載入中...</div>
       </div>
 
-      <!-- 備忘錄 / Reminders -->
-      <div class="card">
+      <!-- 右欄：備忘錄 -->
+      <div class="card col-rem">
         <h2>
-          <span>📝 群組專屬備忘 <small style="font-size:0.75rem; color:#94a3b8; font-weight:normal;">(撳 📌 可全屋廣播)</small></span>
+          <span>📝 群組專屬備忘 <small style="font-size:0.72rem; color:#94a3b8; font-weight:normal;">(撳 📌 全屋廣播)</small></span>
           <span class="last-update" id="db-status">🟢 已同步</span>
         </h2>
         <div class="reminder-input">
-          <input type="text" id="rem-input" placeholder="新增備忘 (例如: 今晚唔返食飯)..." onkeypress="handleEnter(event)">
+          <input type="text" id="rem-input" placeholder="新增備忘 (如: 今晚唔返食飯)..." onkeypress="handleEnter(event)">
           <button onclick="addReminder()">新增</button>
         </div>
         <ul class="reminder-list" id="rem-list"></ul>
@@ -960,7 +343,7 @@
     </div>
   </div>
 
-  <!-- 底部：未來 5 天天氣預報卡 (全站常駐) -->
+  <!-- 底部：5 天天氣預報 -->
   <div class="card">
     <h2>
       <span>🌤️ 未來 5 天天氣預報</span>
@@ -972,8 +355,8 @@
   </div>
 
   <script>
-    /* ================= 1. 初始化 Firebase 與多群組架構 ================= */
-    var firebaseConfig = {
+    /* 1. Firebase 初始化與全域狀態 */
+    firebase.initializeApp({
       apiKey: "AIzaSyBUHonT_ucWcc3Ks4vprZTZV3ji80CVwD4",
       authDomain: "my-home-dashboard-5f8ee.firebaseapp.com",
       databaseURL: "https://my-home-dashboard-5f8ee-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -981,95 +364,51 @@
       storageBucket: "my-home-dashboard-5f8ee.firebasestorage.app",
       messagingSenderId: "508816607799",
       appId: "1:508816607799:web:c2d1c8f646f973cfd00db2"
-    };
+    });
 
-    firebase.initializeApp(firebaseConfig);
     var db = firebase.database();
     var groupsRef = db.ref('family_groups');
-    var globalBroadcastsRef = db.ref('global_broadcasts'); // 全域廣播資料庫節點
-
+    var globalBroadcastsRef = db.ref('global_broadcasts');
     var DEFAULT_BUS_LIST = [
-      {
-        route: "297",
-        dest: "景林邨 往 紅磡(紅鸞道)",
-        stop_id: "22E2678081E88368",
-        dir: "outbound",
-        service_type: "1"
-      },
-      {
-        route: "93A",
-        dest: "景林邨 往 觀塘碼頭",
-        stop_id: "22E2678081E88368",
-        dir: "outbound",
-        service_type: "1"
-      }
+      { route: "297", dest: "景林邨 往 紅磡(紅鸞道)", stop_id: "22E2678081E88368", dir: "outbound", service_type: "1" },
+      { route: "93A", dest: "景林邨 往 觀塘碼頭", stop_id: "22E2678081E88368", dir: "outbound", service_type: "1" }
     ];
 
-    var allGroupsData = {};
-    var currentGroupId = null;
-    try {
-      currentGroupId = localStorage.getItem('active_family_group_id') || null;
-    } catch (e) {}
+    var allGroupsData = {}, currentGroupId = null, currentBusRef = null, currentRemRef = null;
+    var BUS_TRACK_LIST = [], editingGroupId = null, uploadedIconBase64 = "";
+    try { currentGroupId = localStorage.getItem('active_family_group_id') || null; } catch (e) {}
 
-    var currentBusRef = null;
-    var currentRemRef = null;
-    var BUS_TRACK_LIST = [];
-
-    var editingGroupId = null;
-    var uploadedIconBase64 = "";
-
-    // 實時監聽全域共用廣播（全屋成員無論喺首頁定任何群組都同步睇到）
-    globalBroadcastsRef.on('value', function(snapshot) {
-      var data = snapshot.val();
+    /* 全域廣播監聽 */
+    globalBroadcastsRef.on('value', function(snap) {
+      var data = snap.val();
       var banner = document.getElementById('global-pinned-banner');
-      var bannerList = document.getElementById('global-pinned-banner-list');
-      bannerList.innerHTML = '';
+      var list = document.getElementById('global-pinned-banner-list');
+      list.innerHTML = '';
+      if (!data) { banner.className = 'pinned-banner'; return; }
 
-      if (!data) {
-        banner.classList.remove('active');
-        return;
-      }
-
-      var items = [];
-      Object.keys(data).forEach(function(key) {
-        items.push({
-          key: key,
-          text: data[key].text,
-          groupName: data[key].groupName || '屋企'
-        });
-      });
-
-      if (items.length > 0) {
-        banner.classList.add('active');
-        bannerList.innerHTML = items.map(function(p) {
-          return '<div style="display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; -webkit-box-pack:justify; -webkit-justify-content:space-between; justify-content:space-between; gap:0.8rem; width:100%;">' +
-            '<span>• [' + p.groupName + '] ' + p.text + '</span>' +
-            '<button class="pinned-unpin-btn" onclick="removeGlobalBroadcast(\'' + p.key + '\')">收到 / 移除</button>' +
-          '</div>';
+      var keys = Object.keys(data);
+      if (keys.length > 0) {
+        banner.className = 'pinned-banner active';
+        list.innerHTML = keys.map(function(k) {
+          var item = data[k];
+          return '<div class="pinned-row"><span>• [' + (item.groupName || '屋企') + '] ' + item.text + '</span>' +
+                 '<button class="pinned-unpin-btn" onclick="removeGlobalBroadcast(\'' + k + '\')">收到 / 移除</button></div>';
         }).join('');
       } else {
-        banner.classList.remove('active');
+        banner.className = 'pinned-banner';
       }
     });
 
-    // 監聽所有家庭群組
-    groupsRef.on('value', function(snapshot) {
-      var data = snapshot.val();
+    /* 家庭群組監聽 */
+    groupsRef.on('value', function(snap) {
+      var data = snap.val();
       if (!data) {
-        var newGroupRef = groupsRef.push({
-          name: "屋企大廳 (景林邨)",
-          icon: "",
-          createdAt: Date.now()
-        });
-        DEFAULT_BUS_LIST.forEach(function(b) {
-          newGroupRef.child('bus_list').push(b);
-        });
+        var ref = groupsRef.push({ name: "屋企大廳 (景林邨)", icon: "", createdAt: Date.now() });
+        DEFAULT_BUS_LIST.forEach(function(b) { ref.child('bus_list').push(b); });
         return;
       }
-
       allGroupsData = data;
       renderGroupsGrid();
-
       if (currentGroupId && allGroupsData[currentGroupId]) {
         updateActiveGroupHeader(allGroupsData[currentGroupId]);
       } else if (currentGroupId && !allGroupsData[currentGroupId]) {
@@ -1078,783 +417,423 @@
     });
 
     function renderGroupsGrid() {
-      var grid = document.getElementById('groups-grid');
       var html = '';
-
       Object.keys(allGroupsData).forEach(function(gid) {
         var g = allGroupsData[gid];
-        var avatarHtml = g.icon
-          ? '<img class="group-avatar" src="' + g.icon + '" alt="' + g.name + '">'
-          : '<div class="group-avatar">🏠</div>';
-
+        var avatar = g.icon ? '<img class="group-avatar" src="' + g.icon + '">' : '<div class="group-avatar">🏠</div>';
         html += '<div class="group-card" onclick="enterGroup(\'' + gid + '\')">' +
-          '<button class="btn-edit-group-card" title="修改名稱與圖示" onclick="openEditGroupOnHome(event, \'' + gid + '\')">✎</button>' +
-          '<button class="btn-del-group" title="刪除群組" onclick="deleteGroup(event, \'' + gid + '\')">✕</button>' +
-          avatarHtml +
-          '<div class="group-name">' + g.name + '</div>' +
-        '</div>';
+                '<button class="btn-edit-group-card" onclick="openEditGroupOnHome(event, \'' + gid + '\')">✎</button>' +
+                '<button class="btn-del-group" onclick="deleteGroup(event, \'' + gid + '\')">✕</button>' +
+                avatar + '<div class="group-name">' + g.name + '</div></div>';
       });
+      document.getElementById('groups-grid').innerHTML = html;
+    }
 
-      grid.innerHTML = html;
+    function setPreviewElement(id, src) {
+      document.getElementById(id).outerHTML = src
+        ? '<img id="' + id + '" class="avatar-preview" src="' + src + '">'
+        : '<div id="' + id + '" class="avatar-preview">🏠</div>';
     }
 
     function openCreateGroupPanel() {
-      editingGroupId = null;
-      uploadedIconBase64 = "";
+      editingGroupId = null; uploadedIconBase64 = "";
       document.getElementById('group-form-title').innerText = '＋ 建立新家庭群組';
       document.getElementById('group-form-submit-btn').innerText = '確認建立';
       document.getElementById('group-name-input').value = '';
       setPreviewElement('group-avatar-preview', '');
-      document.getElementById('add-group-panel').classList.add('active');
+      document.getElementById('add-group-panel').className = 'add-group-panel active';
     }
 
-    function openEditGroupOnHome(event, gid) {
-      if (event && event.stopPropagation) event.stopPropagation();
+    function openEditGroupOnHome(e, gid) {
+      if (e && e.stopPropagation) e.stopPropagation();
       var g = allGroupsData[gid];
       if (!g) return;
-
-      editingGroupId = gid;
-      uploadedIconBase64 = g.icon || "";
+      editingGroupId = gid; uploadedIconBase64 = g.icon || "";
       document.getElementById('group-form-title').innerText = '✎ 編輯群組：' + g.name;
       document.getElementById('group-form-submit-btn').innerText = '儲存修改';
       document.getElementById('group-name-input').value = g.name;
       setPreviewElement('group-avatar-preview', uploadedIconBase64);
-      document.getElementById('add-group-panel').classList.add('active');
+      document.getElementById('add-group-panel').className = 'add-group-panel active';
     }
 
     function closeGroupPanel() {
       editingGroupId = null;
-      document.getElementById('add-group-panel').classList.remove('active');
-    }
-
-    function setPreviewElement(elementId, iconData) {
-      var el = document.getElementById(elementId);
-      if (iconData) {
-        el.outerHTML = '<img id="' + elementId + '" class="avatar-preview" src="' + iconData + '">';
-      } else {
-        el.outerHTML = '<div id="' + elementId + '" class="avatar-preview">🏠</div>';
-      }
+      document.getElementById('add-group-panel').className = 'add-group-panel';
     }
 
     function clearUploadedIcon(mode) {
       uploadedIconBase64 = "";
-      if (mode === 'home') {
-        setPreviewElement('group-avatar-preview', '');
-      } else {
-        setPreviewElement('in-group-avatar-preview', '');
-      }
+      setPreviewElement(mode === 'home' ? 'group-avatar-preview' : 'in-group-avatar-preview', '');
     }
 
-    function handleGroupIconUpload(event, mode) {
-      var file = event.target.files[0];
+    function handleGroupIconUpload(e, mode) {
+      var file = e.target.files[0];
       if (!file) return;
-
       var reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = function(ev) {
         var img = new Image();
         img.onload = function() {
-          var canvas = document.createElement('canvas');
-          var MAX_SIZE = 160;
-          var w = img.width;
-          var h = img.height;
-
-          if (w > h) {
-            if (w > MAX_SIZE) { h = Math.round(h * (MAX_SIZE / w)); w = MAX_SIZE; }
-          } else {
-            if (h > MAX_SIZE) { w = Math.round(w * (MAX_SIZE / h)); h = MAX_SIZE; }
-          }
-
-          canvas.width = w;
-          canvas.height = h;
-          var ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-
+          var canvas = document.createElement('canvas'), max = 160, w = img.width, h = img.height;
+          if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+          else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           uploadedIconBase64 = canvas.toDataURL('image/jpeg', 0.8);
-          var targetPreviewId = mode === 'home' ? 'group-avatar-preview' : 'in-group-avatar-preview';
-          setPreviewElement(targetPreviewId, uploadedIconBase64);
+          setPreviewElement(mode === 'home' ? 'group-avatar-preview' : 'in-group-avatar-preview', uploadedIconBase64);
         };
-        img.src = e.target.result;
+        img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
     }
 
     function saveGroupFromHome() {
-      var nameInput = document.getElementById('group-name-input');
-      var name = nameInput.value.trim();
+      var name = document.getElementById('group-name-input').value.trim();
       if (!name) return;
-
-      if (editingGroupId) {
-        groupsRef.child(editingGroupId).update({
-          name: name,
-          icon: uploadedIconBase64
-        });
-      } else {
-        groupsRef.push({
-          name: name,
-          icon: uploadedIconBase64 || "",
-          createdAt: Date.now()
-        });
-      }
-
+      if (editingGroupId) groupsRef.child(editingGroupId).update({ name: name, icon: uploadedIconBase64 });
+      else groupsRef.push({ name: name, icon: uploadedIconBase64 || "", createdAt: Date.now() });
       closeGroupPanel();
     }
 
     function toggleInGroupEditPanel() {
-      var panel = document.getElementById('in-group-edit-panel');
-      if (panel.classList.contains('active')) {
-        panel.classList.remove('active');
-        return;
-      }
-      if (!currentGroupId || !allGroupsData[currentGroupId]) return;
-
+      var p = document.getElementById('in-group-edit-panel');
+      if (p.className.indexOf('active') !== -1) { p.className = 'add-group-panel'; return; }
       var g = allGroupsData[currentGroupId];
+      if (!g) return;
       uploadedIconBase64 = g.icon || "";
       document.getElementById('in-group-name-input').value = g.name;
       setPreviewElement('in-group-avatar-preview', uploadedIconBase64);
-      panel.classList.add('active');
+      p.className = 'add-group-panel active';
     }
 
     function saveInGroupEdit() {
-      if (!currentGroupId) return;
-      var newName = document.getElementById('in-group-name-input').value.trim();
-      if (!newName) return;
-
-      groupsRef.child(currentGroupId).update({
-        name: newName,
-        icon: uploadedIconBase64
-      });
-
-      document.getElementById('in-group-edit-panel').classList.remove('active');
+      var name = document.getElementById('in-group-name-input').value.trim();
+      if (!currentGroupId || !name) return;
+      groupsRef.child(currentGroupId).update({ name: name, icon: uploadedIconBase64 });
+      document.getElementById('in-group-edit-panel').className = 'add-group-panel';
     }
 
-    function deleteGroup(event, gid) {
-      if (event && event.stopPropagation) event.stopPropagation();
-      var gname = allGroupsData[gid] ? allGroupsData[gid].name : '';
-      if (confirm('確定要刪除「' + gname + '」群組及其所有巴士與備忘資料嗎？')) {
+    function deleteGroup(e, gid) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      if (confirm('確定要刪除「' + (allGroupsData[gid] ? allGroupsData[gid].name : '') + '」群組嗎？')) {
         groupsRef.child(gid).remove();
       }
     }
 
-    // 進入指定家庭群組
     function enterGroup(gid) {
       if (!allGroupsData[gid]) return;
-
       if (currentBusRef) currentBusRef.off();
       if (currentRemRef) currentRemRef.off();
-
       currentGroupId = gid;
-      try {
-        localStorage.setItem('active_family_group_id', gid);
-      } catch (e) {}
+      try { localStorage.setItem('active_family_group_id', gid); } catch (e) {}
 
       document.getElementById('home-view').style.display = 'none';
-      document.getElementById('in-group-edit-panel').classList.remove('active');
-      document.getElementById('group-view').style.display = 'flex';
-
+      document.getElementById('in-group-edit-panel').className = 'add-group-panel';
+      document.getElementById('group-view').style.display = 'block';
       updateActiveGroupHeader(allGroupsData[gid]);
 
       currentBusRef = db.ref('family_groups/' + gid + '/bus_list');
-      currentBusRef.on('value', function(snapshot) {
-        var data = snapshot.val();
+      currentBusRef.on('value', function(snap) {
+        var data = snap.val();
         if (!data) {
-          BUS_TRACK_LIST = [];
-          latestBusData = [];
-          document.getElementById('bus-container').innerHTML = '<div style="color:#64748b;">此群組暫無監察路線，請按右上角「＋ 新增路線」</div>';
+          BUS_TRACK_LIST = []; latestBusData = [];
+          document.getElementById('bus-container').innerHTML = '<div style="color:#64748b;">暫無路線，請按右上角「＋ 新增路線」</div>';
           return;
         }
-        BUS_TRACK_LIST = Object.keys(data).map(function(key) {
-          var raw = data[key];
-          return {
-            firebaseKey: key,
-            route: raw.route,
-            dest: raw.dest,
-            stop_id: raw.stop_id,
-            dir: raw.dir,
-            service_type: raw.service_type
-          };
+        BUS_TRACK_LIST = Object.keys(data).map(function(k) {
+          var b = data[k];
+          return { firebaseKey: k, route: b.route, dest: b.dest, stop_id: b.stop_id, dir: b.dir, service_type: b.service_type };
         });
         fetchBusETA();
       });
 
-      // 監聽群組備忘
       currentRemRef = db.ref('family_groups/' + gid + '/reminders');
-      currentRemRef.on('value', function(snapshot) {
+      currentRemRef.on('value', function(snap) {
         document.getElementById('db-status').innerText = '🟢 已同步';
-        var data = snapshot.val();
-        var ul = document.getElementById('rem-list');
+        var data = snap.val(), ul = document.getElementById('rem-list');
         ul.innerHTML = '';
-
         if (!data) return;
-
-        Object.keys(data).forEach(function(key) {
-          var item = data[key];
-          var itemText = item.text || '';
-          var isPinned = Boolean(item.pinned);
-          var escapedText = itemText.replace(/'/g, "\\'");
-
-          ul.innerHTML += '<li class="reminder-item ' + (isPinned ? 'pinned' : '') + '">' +
-            '<span>' + itemText + '</span>' +
-            '<div class="rem-actions">' +
-              '<button class="btn-pin ' + (isPinned ? 'active' : '') + '" title="全屋廣播此備忘" onclick="toggleGlobalBroadcast(\'' + key + '\', \'' + escapedText + '\', ' + isPinned + ')">' +
-                '📌 ' + (isPinned ? '已廣播' : '廣播') +
-              '</button>' +
-              '<button class="btn-del-rem" title="刪除" onclick="removeReminder(\'' + key + '\')">✕</button>' +
-            '</div>' +
-          '</li>';
+        Object.keys(data).forEach(function(k) {
+          var txt = (data[k].text || ''), esc = txt.replace(/'/g, "\\'");
+          ul.innerHTML += '<li class="reminder-item"><span class="reminder-text">' + txt + '</span>' +
+            '<div class="rem-actions"><button class="btn-pin" onclick="toggleGlobalBroadcast(\'' + k + '\', \'' + esc + '\')">📌 廣播</button>' +
+            '<button class="btn-del-rem" onclick="removeReminder(\'' + k + '\')">✕</button></div></li>';
         });
       });
     }
 
-    function updateActiveGroupHeader(groupObj) {
-      document.getElementById('active-group-name').innerText = groupObj.name;
-      var avatarContainer = document.getElementById('active-group-avatar');
-      if (groupObj.icon) {
-        avatarContainer.outerHTML = '<img id="active-group-avatar" src="' + groupObj.icon + '" alt="' + groupObj.name + '">';
-      } else {
-        avatarContainer.outerHTML = '<div id="active-group-avatar" class="emoji-avatar">🏠</div>';
-      }
+    function updateActiveGroupHeader(g) {
+      document.getElementById('active-group-name').innerText = g.name;
+      document.getElementById('active-group-avatar').outerHTML = g.icon
+        ? '<img id="active-group-avatar" src="' + g.icon + '">'
+        : '<div id="active-group-avatar" class="emoji-avatar">🏠</div>';
     }
 
     function backToHomeGroups() {
       if (currentBusRef) currentBusRef.off();
       if (currentRemRef) currentRemRef.off();
       currentGroupId = null;
-      try {
-        localStorage.removeItem('active_family_group_id');
-      } catch (e) {}
-
+      try { localStorage.removeItem('active_family_group_id'); } catch (e) {}
       document.getElementById('group-view').style.display = 'none';
-      document.getElementById('home-view').style.display = 'flex';
+      document.getElementById('home-view').style.display = 'block';
     }
 
-    groupsRef.once('value', function(snap) {
-      var val = snap.val();
-      if (currentGroupId && val && val[currentGroupId]) {
-        enterGroup(currentGroupId);
-      }
+    groupsRef.once('value', function(s) {
+      var v = s.val();
+      if (currentGroupId && v && v[currentGroupId]) enterGroup(currentGroupId);
     });
 
-    /* ================= 2. 互動式搜尋九巴路線及站點 ================= */
+    /* 2. 九巴路線搜尋與站點載入 */
     var allStopsCache = null;
-
     function toggleAddBusPanel() {
-      document.getElementById('add-bus-panel').classList.toggle('active');
+      var p = document.getElementById('add-bus-panel');
+      p.className = p.className.indexOf('active') !== -1 ? 'add-bus-panel' : 'add-bus-panel active';
     }
 
     function searchRouteDirections() {
-      var routeInput = document.getElementById('route-input').value.trim().toUpperCase();
+      var route = document.getElementById('route-input').value.trim().toUpperCase();
       var msg = document.getElementById('bus-search-msg');
-      var dirRow = document.getElementById('dir-row');
-      var stopRow = document.getElementById('stop-row');
-      var dirSelect = document.getElementById('dir-select');
-
-      if (!routeInput) return;
-      msg.innerText = '正在搜尋 ' + routeInput + ' 路線資料...';
-      dirRow.style.display = 'none';
-      stopRow.style.display = 'none';
+      var dirRow = document.getElementById('dir-row'), stopRow = document.getElementById('stop-row'), sel = document.getElementById('dir-select');
+      if (!route) return;
+      msg.innerText = '正在搜尋 ' + route + ' 路線資料...';
+      dirRow.style.display = 'none'; stopRow.style.display = 'none';
 
       fetch('https://data.etabus.gov.hk/v1/transport/kmb/route/')
-        .then(function(res) { return res.json(); })
+        .then(function(r) { return r.json(); })
         .then(function(json) {
-          var matches = (json.data || []).filter(function(r) { return r.route === routeInput; });
-
-          if (matches.length === 0) {
-            msg.innerText = '❌ 搵唔到九巴路線「' + routeInput + '」，請確認號碼是否正確。';
-            return;
-          }
-
-          dirSelect.innerHTML = '<option value="">-- 請選擇行車方向 --</option>';
+          var matches = (json.data || []).filter(function(x) { return x.route === route; });
+          if (!matches.length) { msg.innerText = '❌ 搵唔到九巴路線「' + route + '」'; return; }
+          sel.innerHTML = '<option value="">-- 請選擇行車方向 --</option>';
           matches.forEach(function(m) {
-            var boundText = m.bound === 'O' ? 'outbound' : 'inbound';
-            var specialNote = m.service_type !== '1' ? ' (特別班次 ' + m.service_type + ')' : '';
-            var val = JSON.stringify({
-              route: m.route,
-              bound: boundText,
-              service_type: m.service_type,
-              orig_tc: m.orig_tc,
-              dest_tc: m.dest_tc
-            });
-            dirSelect.innerHTML += '<option value=\'' + val + '\'>' + m.orig_tc + ' ➔ 往 ' + m.dest_tc + specialNote + '</option>';
+            var val = JSON.stringify({ route: m.route, bound: m.bound === 'O' ? 'outbound' : 'inbound', service_type: m.service_type, dest_tc: m.dest_tc });
+            var note = m.service_type !== '1' ? ' (特別班次 ' + m.service_type + ')' : '';
+            sel.innerHTML += '<option value=\'' + val + '\'>' + m.orig_tc + ' ➔ 往 ' + m.dest_tc + note + '</option>';
           });
-
-          dirRow.style.display = 'flex';
-          msg.innerText = '請選擇行車方向：';
-        })
-        .catch(function(err) {
-          msg.innerText = '搜尋失敗，請稍後再試。';
-        });
+          dirRow.style.display = 'flex'; msg.innerText = '請選擇行車方向：';
+        }).catch(function() { msg.innerText = '搜尋失敗，請稍後再試。'; });
     }
 
     function loadRouteStops() {
       var dirVal = document.getElementById('dir-select').value;
-      var stopRow = document.getElementById('stop-row');
-      var stopSelect = document.getElementById('stop-select');
-      var msg = document.getElementById('bus-search-msg');
-
-      if (!dirVal) {
-        stopRow.style.display = 'none';
-        return;
-      }
-
+      var stopRow = document.getElementById('stop-row'), sel = document.getElementById('stop-select'), msg = document.getElementById('bus-search-msg');
+      if (!dirVal) { stopRow.style.display = 'none'; return; }
       var info = JSON.parse(dirVal);
-      msg.innerText = '正在載入 ' + info.route + ' (往' + info.dest_tc + ') 沿途巴士站...';
-      stopRow.style.display = 'none';
+      msg.innerText = '正在載入沿途巴士站...'; stopRow.style.display = 'none';
 
-      var stopsPromise = allStopsCache
-        ? Promise.resolve()
-        : fetch('https://data.etabus.gov.hk/v1/transport/kmb/stop')
-            .then(function(allStopsRes) { return allStopsRes.json(); })
-            .then(function(allStopsJson) {
-              allStopsCache = {};
-              (allStopsJson.data || []).forEach(function(s) {
-                allStopsCache[s.stop] = s.name_tc;
-              });
-            });
-
-      stopsPromise
-        .then(function() {
-          var url = 'https://data.etabus.gov.hk/v1/transport/kmb/route-stop/' + info.route + '/' + info.bound + '/' + info.service_type;
-          return fetch(url);
-        })
-        .then(function(res) { return res.json(); })
-        .then(function(json) {
-          var routeStops = json.data || [];
-
-          if (routeStops.length === 0) {
-            msg.innerText = '❌ 此方向暫無站點資料。';
-            return;
-          }
-
-          stopSelect.innerHTML = '';
-          routeStops.forEach(function(rs) {
-            var stopName = allStopsCache[rs.stop] || rs.stop;
-            var cleanName = stopName.replace(/\s*\([A-Z0-9]+\)$/, '');
-            var optionData = JSON.stringify({
-              route: info.route,
-              stop_id: rs.stop,
-              stop_name: cleanName,
-              dest_tc: info.dest_tc,
-              dir: info.bound,
-              service_type: info.service_type
-            });
-            stopSelect.innerHTML += '<option value=\'' + optionData + '\'>' + rs.seq + '. ' + stopName + '</option>';
-          });
-
-          stopRow.style.display = 'flex';
-          msg.innerText = '請揀選你上車嘅巴士站，然後撳「確認加入」：';
-        })
-        .catch(function(err) {
-          console.error(err);
-          msg.innerText = '載入站點失敗，請重試。';
+      var p = allStopsCache ? Promise.resolve() : fetch('https://data.etabus.gov.hk/v1/transport/kmb/stop')
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+          allStopsCache = {};
+          (j.data || []).forEach(function(s) { allStopsCache[s.stop] = s.name_tc; });
         });
+
+      p.then(function() {
+        return fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/' + info.route + '/' + info.bound + '/' + info.service_type);
+      }).then(function(r) { return r.json(); }).then(function(j) {
+        var stops = j.data || [];
+        if (!stops.length) { msg.innerText = '❌ 此方向暫無站點資料。'; return; }
+        sel.innerHTML = '';
+        stops.forEach(function(rs) {
+          var name = (allStopsCache[rs.stop] || rs.stop).replace(/\s*\([A-Z0-9]+\)$/, '');
+          var opt = JSON.stringify({ route: info.route, stop_id: rs.stop, stop_name: name, dest_tc: info.dest_tc, dir: info.bound, service_type: info.service_type });
+          sel.innerHTML += '<option value=\'' + opt + '\'>' + rs.seq + '. ' + (allStopsCache[rs.stop] || rs.stop) + '</option>';
+        });
+        stopRow.style.display = 'flex'; msg.innerText = '請揀選上車巴士站，然後撳「確認加入」：';
+      }).catch(function() { msg.innerText = '載入站點失敗，請重試。'; });
     }
 
     function confirmAddBus() {
-      if (!currentBusRef) return;
-      var stopVal = document.getElementById('stop-select').value;
-      if (!stopVal) return;
-
-      var data = JSON.parse(stopVal);
-      currentBusRef.push({
-        route: data.route,
-        dest: data.stop_name + ' 往 ' + data.dest_tc,
-        stop_id: data.stop_id,
-        dir: data.dir,
-        service_type: String(data.service_type)
-      });
-
+      var v = document.getElementById('stop-select').value;
+      if (!currentBusRef || !v) return;
+      var d = JSON.parse(v);
+      currentBusRef.push({ route: d.route, dest: d.stop_name + ' 往 ' + d.dest_tc, stop_id: d.stop_id, dir: d.dir, service_type: String(d.service_type) });
       document.getElementById('route-input').value = '';
       document.getElementById('dir-row').style.display = 'none';
       document.getElementById('stop-row').style.display = 'none';
       document.getElementById('bus-search-msg').innerText = '';
-      document.getElementById('add-bus-panel').classList.remove('active');
+      document.getElementById('add-bus-panel').className = 'add-bus-panel';
     }
 
-    function removeBusRoute(firebaseKey) {
-      if (!currentBusRef) return;
-      currentBusRef.child(firebaseKey).remove();
-    }
+    function removeBusRoute(k) { if (currentBusRef) currentBusRef.child(k).remove(); }
 
-    /* ================= 3. 時間、夜間自動調暗、防烙印微移與凌晨自愈刷新 ================= */
-    var manualNightOverride = null;
-    var temporaryWakeUntil = 0;
-
-    function isNightHours(now) {
-      var totalMins = now.getHours() * 60 + now.getMinutes();
-      return totalMins >= 1410 || totalMins < 390;
-    }
+    /* 3. 時鐘、23:30 夜間調暗、防烙印微移、04:30 自動重整 */
+    var manualNightOverride = null, temporaryWakeUntil = 0;
 
     function applyNightModeState(now) {
       var btn = document.getElementById('night-mode-btn');
-      var shouldDim = false;
+      var mins = now.getHours() * 60 + now.getMinutes();
+      var autoNight = (mins >= 1410 || mins < 390);
+      var shouldDim = manualNightOverride === true ? true : (manualNightOverride === false ? false : autoNight);
 
-      if (manualNightOverride === true) {
-        shouldDim = true;
-        btn.innerText = '🌙 夜間調暗: 強制開啟';
-        btn.classList.add('active');
-      } else if (manualNightOverride === false) {
-        shouldDim = false;
-        btn.innerText = '☀️ 夜間調暗: 強制關閉';
-        btn.classList.remove('active');
-      } else {
-        shouldDim = isNightHours(now);
-        btn.innerText = '🌙 夜間調暗: 自動 (23:30-06:30)';
-        if (shouldDim) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
-        }
-      }
-
-      if (shouldDim && Date.now() < temporaryWakeUntil) {
-        document.body.classList.remove('night-dimmed');
-      } else {
-        if (shouldDim) {
-          document.body.classList.add('night-dimmed');
-        } else {
-          document.body.classList.remove('night-dimmed');
-        }
-      }
+      btn.innerText = manualNightOverride === true ? '🌙 夜間調暗: 強制開啟'
+                    : manualNightOverride === false ? '☀️ 夜間調暗: 強制關閉'
+                    : '🌙 夜間調暗: 自動 (23:30-06:30)';
+      btn.className = shouldDim ? 'btn-night-toggle active' : 'btn-night-toggle';
+      document.body.className = (shouldDim && Date.now() >= temporaryWakeUntil) ? 'night-dimmed' : '';
     }
 
     function toggleManualNightMode(e) {
       if (e && e.stopPropagation) e.stopPropagation();
-      if (manualNightOverride === null) {
-        manualNightOverride = true;
-      } else if (manualNightOverride === true) {
-        manualNightOverride = false;
-      } else {
-        manualNightOverride = null;
-      }
+      manualNightOverride = manualNightOverride === null ? true : (manualNightOverride === true ? false : null);
       temporaryWakeUntil = 0;
       applyNightModeState(new Date());
     }
 
     document.addEventListener('click', function() {
-      if (document.body.classList.contains('night-dimmed')) {
+      if (document.body.className === 'night-dimmed') {
         temporaryWakeUntil = Date.now() + 60000;
-        document.body.classList.remove('night-dimmed');
+        document.body.className = '';
       }
     });
 
     function updateClock() {
       var now = new Date();
-      document.getElementById('clock').innerText = now.toLocaleTimeString('zh-HK', {
-        hour12: true,
-        hour: 'numeric',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-
-      var options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
-      document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', options);
-
+      document.getElementById('clock').innerText = now.toLocaleTimeString('zh-HK', { hour12: true, hour: 'numeric', minute: '2-digit', second: '2-digit' });
+      document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
       applyNightModeState(now);
-
-      if (now.getHours() === 4 && now.getMinutes() === 30 && now.getSeconds() === 5) {
-        window.location.reload();
-      }
+      if (now.getHours() === 4 && now.getMinutes() === 30 && now.getSeconds() === 5) window.location.reload();
     }
-    setInterval(updateClock, 1000);
-    updateClock();
+    setInterval(updateClock, 1000); updateClock();
 
-    var shiftStep = 0;
-    var shiftOffsets = [
-      'translate(0px, 0px)',
-      'translate(2px, 1px)',
-      'translate(-1px, 2px)',
-      'translate(-2px, -1px)',
-      'translate(1px, -2px)'
-    ];
+    var shiftStep = 0, shiftOffsets = ['translate(0,0)', 'translate(2px,1px)', 'translate(-1px,2px)', 'translate(-2px,-1px)', 'translate(1px,-2px)'];
     setInterval(function() {
       shiftStep = (shiftStep + 1) % shiftOffsets.length;
       document.body.style.webkitTransform = shiftOffsets[shiftStep];
       document.body.style.transform = shiftOffsets[shiftStep];
     }, 600000);
 
-    /* ================= 4. 天文台即時天氣 + 未來兩小時帶遮建議 + 5天預報 ================= */
-    function safeJsonFetch(url) {
-      return fetch(url)
-        .then(function(res) { return res.json(); })
-        .catch(function() { return {}; });
-    }
+    /* 4. 天文台天氣與 5 天預報 */
+    function safeJson(url) { return fetch(url).then(function(r) { return r.json(); }).catch(function() { return {}; }); }
 
     function fetchWeather() {
-      var ts = Date.now();
-      var rhrUrl = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc&t=' + ts;
-      var warnUrl = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc&t=' + ts;
-      var flwUrl = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc&t=' + ts;
-      var swtUrl = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=swt&lang=tc&t=' + ts;
-
-      Promise.all([
-        safeJsonFetch(rhrUrl),
-        safeJsonFetch(warnUrl),
-        safeJsonFetch(flwUrl),
-        safeJsonFetch(swtUrl)
-      ]).then(function(results) {
-        var data = results[0] || {};
-        var warnData = results[1] || {};
-        var swtData = results[3] || {};
-
-        if (data.temperature && data.temperature.data && data.temperature.data.length > 0) {
-          var tkoStation = null;
+      var t = Date.now(), base = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?lang=tc&t=' + t + '&dataType=';
+      Promise.all([safeJson(base + 'rhrread'), safeJson(base + 'warnsum'), safeJson(base + 'swt')]).then(function(res) {
+        var data = res[0] || {}, warn = res[1] || {}, swt = res[2] || {};
+        if (data.temperature && data.temperature.data && data.temperature.data.length) {
+          var st = data.temperature.data[0];
           for (var i = 0; i < data.temperature.data.length; i++) {
-            if (data.temperature.data[i].place === '將軍澳') {
-              tkoStation = data.temperature.data[i];
-              break;
-            }
+            if (data.temperature.data[i].place === '將軍澳') { st = data.temperature.data[i]; break; }
           }
-          if (!tkoStation) tkoStation = data.temperature.data[0];
-          document.getElementById('temp').innerText = tkoStation.value + '°C';
+          document.getElementById('temp').innerText = st.value + '°C';
         }
-        var humidity = (data.humidity && data.humidity.data && data.humidity.data.length > 0) ? data.humidity.data[0].value : '--';
-
-        var currentRainMm = 0;
+        var hum = (data.humidity && data.humidity.data && data.humidity.data[0]) ? data.humidity.data[0].value : '--';
+        var rainMm = 0;
         if (data.rainfall && data.rainfall.data) {
           for (var j = 0; j < data.rainfall.data.length; j++) {
             var r = data.rainfall.data[j];
-            if (r.place === '西貢' || r.place === '將軍澳') {
-              if (r.max > 0) {
-                currentRainMm = r.max;
-              }
-              break;
-            }
+            if ((r.place === '西貢' || r.place === '將軍澳') && r.max > 0) { rainMm = r.max; break; }
           }
         }
-        var rainText = currentRainMm > 0 ? '🌧️ 實時雨量: ' + currentRainMm + 'mm' : '實時無雨';
+        var wList = [];
+        if (warn.WRAIN) wList.push('⚠️ ' + warn.WRAIN.name);
+        if (warn.WTS) wList.push('⚡ 雷暴警告');
+        if (warn.WTCSGNL) wList.push('🌀 ' + warn.WTCSGNL.name);
+        if (warn.WFIRE) wList.push('🔥 火災危險');
+        if (warn.WCOLD) wList.push('❄️ 寒冷天氣');
+        if (warn.WHOT) wList.push('☀️ 酷熱天氣');
+        var wBadge = wList.length ? '<span style="color:#ef4444; font-weight:bold; margin-left:0.4rem;">[' + wList.join(' ') + ']</span>' : '';
 
-        var warningBadge = '';
-        if (warnData && typeof warnData === 'object') {
-          var warnings = [];
-          if (warnData.WRAIN) warnings.push('⚠️ ' + warnData.WRAIN.name);
-          if (warnData.WTS) warnings.push('⚡ 雷暴警告');
-          if (warnData.WTCSGNL) warnings.push('🌀 ' + warnData.WTCSGNL.name);
-          if (warnData.WFIRE) warnings.push('🔥 火災危險');
-          if (warnData.WCOLD) warnings.push('❄️ 寒冷天氣');
-          if (warnData.WHOT) warnings.push('☀️ 酷熱天氣');
+        document.getElementById('weather-desc').innerHTML = '將軍澳 | 濕度: ' + hum + '% | ' + (rainMm > 0 ? '🌧️ 實時雨量: ' + rainMm + 'mm' : '實時無雨') + ' ' + wBadge;
 
-          if (warnings.length > 0) {
-            warningBadge = '<span style="color:#ef4444; font-weight:bold; margin-left:0.4rem;">[' + warnings.join(' ') + ']</span>';
-          }
-        }
-
-        document.getElementById('weather-desc').innerHTML = '將軍澳 | 濕度: ' + humidity + '% | ' + rainText + ' ' + warningBadge;
-
-        var rainTipEl = document.getElementById('rain-tip');
-        var swtList = (swtData.swt || []).map(function(s) { return s.desc; }).join(' ');
-
-        if (currentRainMm > 0 || (warnData && warnData.WRAIN)) {
-          rainTipEl.className = 'rain-tip danger';
-          rainTipEl.innerText = '☔ 將軍澳現正落雨 (' + currentRainMm + 'mm)，出門務必帶遮！';
-        } else if (swtList.indexOf('雨') !== -1 || swtList.indexOf('雷暴') !== -1 || (warnData && warnData.WTS)) {
-          rainTipEl.className = 'rain-tip danger';
-          rainTipEl.innerText = '☔ 天文台雷達顯示附近有雨區或雷暴';
+        var tip = document.getElementById('rain-tip');
+        var swtTxt = (swt.swt || []).map(function(s) { return s.desc; }).join(' ');
+        if (rainMm > 0 || warn.WRAIN) {
+          tip.className = 'rain-tip danger'; tip.innerText = '☔ 將軍澳現正落雨 (' + rainMm + 'mm)，出門務必帶遮！';
+        } else if (swtTxt.indexOf('雨') !== -1 || swtTxt.indexOf('雷暴') !== -1 || warn.WTS) {
+          tip.className = 'rain-tip danger'; tip.innerText = '☔ 天文台雷達顯示附近有雨區或雷暴';
         } else {
-          rainTipEl.className = 'rain-tip safe';
-          rainTipEl.innerText = '🟢 將軍澳目前無雨，可放心出門';
+          tip.className = 'rain-tip safe'; tip.innerText = '🟢 將軍澳目前無雨，可放心出門';
         }
-      }).catch(function(err) {
-        console.error("即時天氣更新失敗:", err);
       });
     }
 
     function fetch5DayForecast() {
-      fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc&t=' + Date.now())
-        .then(function(res) { return res.json(); })
-        .then(function(data) {
-          var grid = document.getElementById('forecast-grid');
-
-          if (!data.weatherForecast || data.weatherForecast.length === 0) return;
-
-          if (data.generalSituation) {
-            document.getElementById('fnd-desc').innerText = data.generalSituation.split('。')[0] + '。';
-          }
-
-          var next5Days = data.weatherForecast.slice(0, 5);
-          var html = '';
-
-          next5Days.forEach(function(day, idx) {
-            var m = day.forecastDate.slice(4, 6);
-            var d = day.forecastDate.slice(6, 8);
-            var weekLabel = idx === 0 ? '明日 (' + day.week.replace('星期', '週') + ')' : day.week;
-            var iconUrl = 'https://www.hko.gov.hk/images/HKOWxIconOutline/pic' + day.ForecastIcon + '.png';
-            var psrText = day.PSR ? '☔ 降雨機率: ' + day.PSR : '';
-
-            html += '<div class="forecast-day">' +
-              '<div class="f-week">' + weekLabel + '</div>' +
-              '<div class="f-date">' + m + '月' + d + '日</div>' +
-              '<img class="f-icon" src="' + iconUrl + '" alt="' + day.forecastWeather + '">' +
-              '<div class="f-temp">' + day.forecastMintemp.value + '° - ' + day.forecastMaxtemp.value + '°C</div>' +
-              '<div class="f-psr">' + psrText + '</div>' +
-            '</div>';
-          });
-
-          grid.innerHTML = html;
-        })
-        .catch(function(err) {
-          console.error("5天預報更新失敗:", err);
-        });
-    }
-
-    fetchWeather();
-    fetch5DayForecast();
-    setInterval(fetchWeather, 300000);
-    setInterval(fetch5DayForecast, 1800000);
-
-    /* ================= 5. 九巴實時到站時間 (每秒即時倒數版) ================= */
-    var latestBusData = [];
-
-    function fetchBusETA() {
-      if (!currentGroupId || BUS_TRACK_LIST.length === 0) {
-        document.getElementById('bus-container').innerHTML = '<div style="color:#64748b;">此群組暫無監察路線，請按右上角「＋ 新增路線」</div>';
-        return;
-      }
-
-      var tempResults = new Array(BUS_TRACK_LIST.length);
-      var tasks = BUS_TRACK_LIST.map(function(item, index) {
-        var url = 'https://data.etabus.gov.hk/v1/transport/kmb/eta/' + item.stop_id + '/' + item.route + '/' + item.service_type + '?t=' + Date.now();
-        return fetch(url)
-          .then(function(res) { return res.json(); })
-          .then(function(json) {
-            var expectedDirCode = item.dir === 'inbound' ? 'I' : 'O';
-            var etas = (json.data || [])
-              .filter(function(e) { return e.eta && (!e.dir || e.dir === expectedDirCode); })
-              .slice(0, 3);
-
-            tempResults[index] = {
-              firebaseKey: item.firebaseKey,
-              route: item.route,
-              dest: item.dest,
-              stop_id: item.stop_id,
-              dir: item.dir,
-              service_type: item.service_type,
-              etas: etas,
-              error: false
-            };
-          })
-          .catch(function(err) {
-            console.error('獲取 ' + item.route + ' 失敗:', err);
-            tempResults[index] = {
-              firebaseKey: item.firebaseKey,
-              route: item.route,
-              dest: item.dest,
-              stop_id: item.stop_id,
-              dir: item.dir,
-              service_type: item.service_type,
-              etas: [],
-              error: true
-            };
-          });
+      safeJson('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc&t=' + Date.now()).then(function(d) {
+        if (!d.weatherForecast || !d.weatherForecast.length) return;
+        if (d.generalSituation) document.getElementById('fnd-desc').innerText = d.generalSituation.split('。')[0] + '。';
+        document.getElementById('forecast-grid').innerHTML = d.weatherForecast.slice(0, 5).map(function(day, idx) {
+          var wk = idx === 0 ? '明日 (' + day.week.replace('星期', '週') + ')' : day.week;
+          return '<div class="forecast-day"><div class="f-week">' + wk + '</div>' +
+                 '<div class="f-date">' + day.forecastDate.slice(4,6) + '月' + day.forecastDate.slice(6,8) + '日</div>' +
+                 '<img class="f-icon" src="https://www.hko.gov.hk/images/HKOWxIconOutline/pic' + day.ForecastIcon + '.png">' +
+                 '<div class="f-temp">' + day.forecastMintemp.value + '° - ' + day.forecastMaxtemp.value + '°C</div>' +
+                 '<div class="f-psr">' + (day.PSR ? '☔ 降雨機率: ' + day.PSR : '') + '</div></div>';
+        }).join('');
       });
+    }
+    fetchWeather(); fetch5DayForecast();
+    setInterval(fetchWeather, 300000); setInterval(fetch5DayForecast, 1800000);
 
+    /* 5. 九巴實時到站時間 (每秒倒數) */
+    var latestBusData = [];
+    function fetchBusETA() {
+      if (!currentGroupId || !BUS_TRACK_LIST.length) return;
+      var temp = new Array(BUS_TRACK_LIST.length);
+      var tasks = BUS_TRACK_LIST.map(function(item, idx) {
+        var url = 'https://data.etabus.gov.hk/v1/transport/kmb/eta/' + item.stop_id + '/' + item.route + '/' + item.service_type + '?t=' + Date.now();
+        return fetch(url).then(function(r) { return r.json(); }).then(function(j) {
+          var code = item.dir === 'inbound' ? 'I' : 'O';
+          var etas = (j.data || []).filter(function(e) { return e.eta && (!e.dir || e.dir === code); }).slice(0, 3);
+          temp[idx] = { firebaseKey: item.firebaseKey, route: item.route, dest: item.dest, etas: etas, error: false };
+        }).catch(function() {
+          temp[idx] = { firebaseKey: item.firebaseKey, route: item.route, dest: item.dest, etas: [], error: true };
+        });
+      });
       Promise.all(tasks).then(function() {
-        latestBusData = tempResults;
+        latestBusData = temp;
         document.getElementById('eta-updated').innerText = '同步: ' + new Date().toLocaleTimeString('zh-HK', { hour12: true });
         renderBusETA();
       });
     }
 
     function renderBusETA() {
-      var container = document.getElementById('bus-container');
-      if (!currentGroupId || latestBusData.length === 0) return;
-
-      var now = new Date();
-      var html = '';
-
-      for (var i = 0; i < latestBusData.length; i++) {
-        var item = latestBusData[i];
-        if (!item) continue;
-
-        html += '<div class="bus-group">' +
-          '<div class="bus-header">' +
-            '<div class="bus-title">' +
-              item.route +
-              '<span class="bus-subtitle">(' + item.dest + ')</span>' +
-            '</div>' +
-            '<button class="btn-del-bus" onclick="removeBusRoute(\'' + item.firebaseKey + '\')">刪除</button>' +
-          '</div>';
-
+      if (!currentGroupId || !latestBusData.length) return;
+      var now = new Date(), html = '';
+      latestBusData.forEach(function(item) {
+        if (!item) return;
+        html += '<div class="bus-group"><div class="bus-header"><div class="bus-title">' + item.route +
+                '<span class="bus-subtitle">(' + item.dest + ')</span></div>' +
+                '<button class="btn-del-bus" onclick="removeBusRoute(\'' + item.firebaseKey + '\')">刪除</button></div>';
         if (item.error) {
-          html += '<div style="color:#ef4444; font-size:0.9rem;">連線失敗，重試中...</div>';
-        } else if (item.etas.length === 0) {
-          html += '<div style="color:#64748b; font-size:0.9rem;">未有實時班次 / 已過尾班車</div>';
+          html += '<div style="color:#ef4444; font-size:0.88rem;">連線失敗，重試中...</div>';
+        } else if (!item.etas.length) {
+          html += '<div style="color:#64748b; font-size:0.88rem;">未有實時班次 / 已過尾班車</div>';
         } else {
-          item.etas.forEach(function(e, idx) {
-            var etaDate = new Date(e.eta);
-            var diffSec = Math.floor((etaDate - now) / 1000);
-            var etaTimeStr = etaDate.toLocaleTimeString('zh-HK', { hour: 'numeric', minute: '2-digit', hour12: true });
-            var countdownText = '';
-            var isUrgent = false;
-
-            if (diffSec <= 0) {
-              countdownText = '即將抵達 / 已到站';
-              isUrgent = true;
-            } else {
-              var mins = Math.floor(diffSec / 60);
-              var rawSecs = String(diffSec % 60);
-              var secs = rawSecs.length < 2 ? '0' + rawSecs : rawSecs;
-              countdownText = mins + '分 ' + secs + '秒';
-              if (mins < 5) isUrgent = true;
+          item.etas.forEach(function(e, i) {
+            var d = new Date(e.eta), sec = Math.floor((d - now) / 1000);
+            var tStr = d.toLocaleTimeString('zh-HK', { hour: 'numeric', minute: '2-digit', hour12: true });
+            var cd = '即將抵達 / 已到站', urgent = true;
+            if (sec > 0) {
+              var m = Math.floor(sec / 60), s = String(sec % 60);
+              cd = m + '分 ' + (s.length < 2 ? '0' + s : s) + '秒';
+              urgent = m < 5;
             }
-
-            html += '<div class="eta-row">' +
-              '<span class="eta-seq">第 ' + (idx + 1) + ' 班 (' + etaTimeStr + ')</span>' +
-              '<span class="eta-countdown ' + (isUrgent ? 'eta-urgent' : '') + '">' +
-                countdownText +
-              '</span>' +
-            '</div>';
+            html += '<div class="eta-row"><span class="eta-seq">第 ' + (i + 1) + ' 班 (' + tStr + ')</span>' +
+                    '<span class="eta-countdown ' + (urgent ? 'eta-urgent' : '') + '">' + cd + '</span></div>';
           });
         }
         html += '</div>';
-      }
-
-      container.innerHTML = html;
-    }
-
-    setInterval(fetchBusETA, 15000);
-    setInterval(renderBusETA, 1000);
-
-    /* ================= 6. 群組專屬備忘錄與全域廣播操作 ================= */
-    window.addReminder = function() {
-      if (!currentRemRef) return;
-      var input = document.getElementById('rem-input');
-      var val = input.value.trim();
-      if (!val) return;
-      currentRemRef.push({
-        text: val,
-        createdAt: Date.now()
       });
+      document.getElementById('bus-container').innerHTML = html;
+    }
+    setInterval(fetchBusETA, 15000); setInterval(renderBusETA, 1000);
+
+    /* 6. 備忘錄與全屋廣播 */
+    window.addReminder = function() {
+      var input = document.getElementById('rem-input'), val = input.value.trim();
+      if (!currentRemRef || !val) return;
+      currentRemRef.push({ text: val, createdAt: Date.now() });
       input.value = '';
     };
-
-    // 點擊「廣播」：將該備忘推送到全域廣播節點，全屋所有頁面即時彈出
     window.toggleGlobalBroadcast = function(key, text) {
       if (!currentGroupId || !allGroupsData[currentGroupId]) return;
-      var groupName = allGroupsData[currentGroupId].name;
-
-      // 用備忘嘅 key 作為 global_broadcasts 嘅 ID，避免重複
-      globalBroadcastsRef.child(key).set({
-        text: text,
-        groupName: groupName,
-        createdAt: Date.now()
-      });
+      globalBroadcastsRef.child(key).set({ text: text, groupName: allGroupsData[currentGroupId].name, createdAt: Date.now() });
     };
-
-    // 點擊「收到 / 移除」：清除該條全域廣播
-    window.removeGlobalBroadcast = function(key) {
-      globalBroadcastsRef.child(key).remove();
-    };
-
+    window.removeGlobalBroadcast = function(key) { globalBroadcastsRef.child(key).remove(); };
     window.removeReminder = function(key) {
-      if (!currentRemRef) return;
-      currentRemRef.child(key).remove();
-      // 同時如果呢個備忘之前有發佈到全域廣播，順便清除埋
+      if (currentRemRef) currentRemRef.child(key).remove();
       globalBroadcastsRef.child(key).remove();
     };
-
-    function handleEnter(e) {
-      if (e.key === 'Enter' || e.keyCode === 13) window.addReminder();
-    }
+    function handleEnter(e) { if (e.key === 'Enter' || e.keyCode === 13) window.addReminder(); }
   </script>
 </body>
 </html>
